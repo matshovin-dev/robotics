@@ -1,0 +1,43 @@
+# Kompilerte filer og executables
+*.o
+*.out
+*.exe
+*.app
+*.a
+*.so
+*.dylib
+
+# Test executables (men behold test source)
+test_*
+!tests/test_*.c
+
+# MacOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# VS Code
+.vscode/*
+!.vscode/settings.json
+
+# Build artifacts
+build/
+dist/
+bin/
+
+# Temporary files
+*.tmp
+*.swp
+*~
+*.autosave
+*.bak
+
+# Python (hvis du later legger til Python scripts)
+__pycache__/
+*.pyc
+*.pyo
+
+# Documentation generated (Doxygen etc)
+html/
+latex/
+docs/generated/

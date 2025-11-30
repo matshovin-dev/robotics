@@ -1,0 +1,53 @@
+#include <stdio.h>
+#include <stewart/pose.h>
+#include <string.h>
+
+void stewart_pose_init(struct stewart_pose *pose)
+{
+	if (!pose)
+		return;
+
+	pose->rx = 0.0f;
+	pose->ry = 0.0f;
+	pose->rz = 0.0f;
+	pose->tx = 0.0f;
+	pose->ty = 0.0f;
+	pose->tz = 0.0f;
+}
+
+void stewart_pose_set(struct stewart_pose *pose, float rx, float ry, float rz,
+		      float tx, float ty, float tz)
+{
+	if (!pose)
+		return;
+
+	pose->rx = rx;
+	pose->ry = ry;
+	pose->rz = rz;
+	pose->tx = tx;
+	pose->ty = ty;
+	pose->tz = tz;
+}
+
+void stewart_pose_copy(struct stewart_pose *dest,
+		       const struct stewart_pose *src)
+{
+	if (!dest || !src)
+		return;
+
+	memcpy(dest, src, sizeof(struct stewart_pose));
+}
+
+void stewart_pose_print(const struct stewart_pose *pose)
+{
+	if (!pose) {
+		printf("stewart_pose: NULL\n");
+		return;
+	}
+
+	printf("stewart_pose:\n");
+	printf("  Rotation: rx=%.2f° ry=%.2f° rz=%.2f°\n", pose->rx, pose->ry,
+	       pose->rz);
+	printf("  Position: tx=%.2f ty=%.2f tz=%.2f mm\n", pose->tx, pose->ty,
+	       pose->tz);
+}
