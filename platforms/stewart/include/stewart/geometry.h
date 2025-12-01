@@ -1,7 +1,7 @@
 #ifndef STEWART_GEOMETRY_H
 #define STEWART_GEOMETRY_H
 
-#include <robotics/math/vec3.h>
+#include "robotics/math/vec3.h"
 
 /**
  * struct stewart_geometry - Stewart platform fysisk geometri

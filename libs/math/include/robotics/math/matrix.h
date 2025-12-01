@@ -1,7 +1,7 @@
 #ifndef ROBOTICS_MATH_MATRIX_H
 #define ROBOTICS_MATH_MATRIX_H
 
-#include <robotics/math/vec3.h>
+#include "robotics/math/vec3.h"
 
 /**
  * struct mat3 - 3x3 rotasjonsmatrise

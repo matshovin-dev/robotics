@@ -1,5 +1,5 @@
+#include "robotics/math/utils.h"
 #include <math.h>
-#include <robotics/math/utils.h>
 
 float deg_to_rad(float degrees)
 {

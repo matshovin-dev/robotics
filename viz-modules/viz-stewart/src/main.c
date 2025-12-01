@@ -1,11 +1,11 @@
-#include "udp.h"
+#include "robotics/math/matrix.h"
+#include "robotics/math/utils.h"
+#include "robotics/math/vec3.h"
 #include "viz_protocol.h"
+#include "udp.h"
 #include <GLFW/glfw3.h>
 #include <OpenGL/glu.h> /* ← LEGG TIL */
 #include <math.h>
-#include <robotics/math/matrix.h>
-#include <robotics/math/utils.h>
-#include <robotics/math/vec3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -159,10 +159,12 @@ static void poll_udp(void)
 		if (packet.magic == VIZ_MAGIC &&
 		    packet.type == VIZ_PACKET_POSE) {
 			current_pose = packet;
+			/*
 			printf("Pose: rx=%.1f ry=%.1f rz=%.1f "
 			       "tx=%.1f ty=%.1f tz=%.1f\n",
 			       packet.rx, packet.ry, packet.rz, packet.tx,
 			       packet.ty, packet.tz);
+			       */
 		}
 	}
 }

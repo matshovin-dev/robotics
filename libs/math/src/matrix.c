@@ -1,5 +1,5 @@
+#include "robotics/math/matrix.h"
 #include <math.h>
-#include <robotics/math/matrix.h>
 #include <string.h>
 
 void mat3_identity(struct mat3 *mat)

@@ -1,5 +1,5 @@
+#include "robotics/math/vec3.h"
 #include <math.h>
-#include <robotics/math/vec3.h>
 
 float vec3_length(const struct vec3 *v)
 {

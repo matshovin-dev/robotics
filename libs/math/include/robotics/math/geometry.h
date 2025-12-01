@@ -1,7 +1,7 @@
 #ifndef ROBOTICS_MATH_GEOMETRY_H
 #define ROBOTICS_MATH_GEOMETRY_H
 
-#include <robotics/math/vec3.h>
+#include "robotics/math/vec3.h"
 
 /**
  * distance_point_to_plane - Beregn avstand fra punkt til plan

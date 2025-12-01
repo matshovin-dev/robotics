@@ -1,5 +1,5 @@
+#include "stewart/geometry.h"
 #include <stdio.h>
-#include <stewart/geometry.h>
 
 void stewart_geometry_print(const struct stewart_geometry *geom)
 {

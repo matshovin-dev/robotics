@@ -1,5 +1,5 @@
+#include "stewart/pose.h"
 #include <stdio.h>
-#include <stewart/pose.h>
 #include <string.h>
 
 void stewart_pose_init(struct stewart_pose *pose)

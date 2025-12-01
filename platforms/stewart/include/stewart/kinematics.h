@@ -1,7 +1,7 @@
 #ifndef STEWART_KINEMATICS_H
 #define STEWART_KINEMATICS_H
 
-#include <robotics/math/vec3.h>
+#include "robotics/math/vec3.h"
 #include <stewart/geometry.h>
 #include <stewart/pose.h>
 
