@@ -194,8 +194,8 @@ int main(void)
 			pose.magic = VIZ_MAGIC;
 			pose.type = VIZ_PACKET_POSE;
 			pose.robot_type = ROBOT_TYPE_MX64;
-			pose.rx = 10.0f; /* Endre disse verdiene */
-			pose.ry = 5.0f;
+			pose.rx = 0.0f; /* Endre disse verdiene */
+			pose.ry = 0.0f;
 			pose.rz = 0.0f;
 			pose.tx = 0.0f;
 			pose.ty = 0.0f;

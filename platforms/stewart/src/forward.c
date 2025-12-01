@@ -1,7 +1,7 @@
-#include "robotics/math/vec3.h"
 #include <stdio.h>
-#include <stewart/kinematics.h>
 #include <string.h>
+#include <stewart/kinematics.h>
+#include "robotics/math/vec3.h"
 
 /* Simulerings-parametere for fjær-modell */
 static const float SPRING_K = 0.6f; /* Fjærkonstant */
@@ -68,10 +68,11 @@ calculate_leg_forces(const struct stewart_geometry *geom,
  * Summerer alle ben-kraftvektorer til total kraft.
  * Beregner moment som r × F (kryssprodukt) for hvert ben.
  */
-static void calculate_total_force_and_moment(
-	const struct stewart_inverse_result *result_inv,
-	const struct stewart_forward_result *result_forv,
-	struct vec3 *total_force, struct vec3 *total_moment)
+static void
+calculate_total_force_and_moment(const struct stewart_inverse_result *result_inv,
+				  const struct stewart_forward_result *result_forv,
+				  struct vec3 *total_force,
+				  struct vec3 *total_moment)
 {
 	struct vec3 moment_contribution;
 	int i;
