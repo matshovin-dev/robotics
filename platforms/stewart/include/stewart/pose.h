@@ -7,11 +7,14 @@
  * @ry: Pitch - rotasjon rundt Y-akse (grader)
  * @rz: Yaw - rotasjon rundt Z-akse (grader)
  * @tx: X translasjon (mm)
- * @ty: Y translasjon / høyde (mm)
+ * @ty: Y translasjon / høyde offset fra home-posisjon (mm)
  * @tz: Z translasjon (mm)
  *
  * Representerer platformens posisjon og orientering i 3D rom.
  * Alle rotasjoner i grader, alle translasjoner i millimeter.
+ *
+ * NB: ty er offset fra home-posisjon (ty = 0 betyr platform ved home_height).
+ *     Dette gjør pose uavhengig av robottype siden home_height varierer.
  *
  * Koordinatsystem:
  *   X+ = Høyre (rød akse)

@@ -141,13 +141,7 @@ void stewart_kinematics_forward(const struct stewart_geometry *geom,
 	result_forv->total_force = total_force;
 	result_forv->total_moment = total_moment;
 
-	result_forv->position.x = pose_calc->tx;
-	result_forv->position.y = pose_calc->ty;
-	result_forv->position.z = pose_calc->tz;
-
-	result_forv->rotation.x = pose_calc->rx;
-	result_forv->rotation.y = pose_calc->ry;
-	result_forv->rotation.z = pose_calc->rz;
+	result_forv->pose_result = *pose_calc;
 }
 
 void stewart_forward_result_print(const struct stewart_forward_result *result)
@@ -172,7 +166,7 @@ void stewart_forward_result_print(const struct stewart_forward_result *result)
 	}
 
 	printf("\n  Calculated position: (%.2f, %.2f, %.2f) mm\n",
-	       result->position.x, result->position.y, result->position.z);
+	       result->pose_result.tx, result->pose_result.ty, result->pose_result.tz);
 	printf("  Calculated rotation: (%.2f, %.2f, %.2f)°\n",
-	       result->rotation.x, result->rotation.y, result->rotation.z);
+	       result->pose_result.rx, result->pose_result.ry, result->pose_result.rz);
 }

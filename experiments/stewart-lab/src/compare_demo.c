@@ -170,12 +170,7 @@ generate_calculated_motion(const struct stewart_geometry *geometry,
 	}
 
 	/* Kopier resultat fra forward_result til calc_pose */
-	calc_pose->rx = forward_result->rotation.x;
-	calc_pose->ry = forward_result->rotation.y;
-	calc_pose->rz = forward_result->rotation.z;
-	calc_pose->tx = forward_result->position.x;
-	calc_pose->ty = forward_result->position.y;
-	calc_pose->tz = forward_result->position.z;
+	*calc_pose = forward_result->pose_result;
 }
 
 int main(void)

@@ -33,16 +33,15 @@ static float soft_clamp(float value, float min, float max, float margin)
 /**
  * calculate_transformed_platform_points - Transform platform punkter med pose
  * @geom: robot geometri
- * @pose: ønsket pose
+ * @pose_in: ønsket pose
  * @result: output - transformerte platform punkter
  *
  * Roterer platform punkter med ZYX Euler angles og translerer med pose.
  * Inkluderer home_height i translasjon.
  */
-static void
-calculate_transformed_platform_points(const struct stewart_geometry *geom,
-				      const struct stewart_pose *pose,
-				      struct stewart_inverse_result *result)
+void calculate_transformed_platform_points(
+	const struct stewart_geometry *geom, const struct stewart_pose *pose_in,
+	struct stewart_inverse_result *result)
 {
 	struct mat3 rotation;
 	struct vec3 translation;
@@ -50,18 +49,18 @@ calculate_transformed_platform_points(const struct stewart_geometry *geom,
 
 	/* Lag rotasjonsmatrise fra Euler vinkler (ZYX convention) */
 	mat3_identity(&rotation);
-	mat3_rotate_xyz(&rotation, deg_to_rad(pose->rx), deg_to_rad(pose->ry),
-			deg_to_rad(pose->rz));
+	mat3_rotate_xyz(&rotation, deg_to_rad(pose_in->rx),
+			deg_to_rad(pose_in->ry), deg_to_rad(pose_in->rz));
 
 	/* Translasjon inkluderer home height */
-	translation.x = pose->tx;
-	translation.y = pose->ty + geom->home_height;
-	translation.z = pose->tz;
+	translation.x = pose_in->tx;
+	translation.y = pose_in->ty + geom->home_height;
+	translation.z = pose_in->tz;
 
 	/* Transform alle platform punkter */
 	for (i = 0; i < 6; i++) {
 		/* Roter punkt */
-		mat3_transform_vec3(&rotation, &geom->platform_points[i],
+		mat3_transform_vec3(&rotation, &geom->platform_points_flat[i],
 				    &result->platform_points_transformed[i]);
 
 		/* Translater punkt */
@@ -106,6 +105,10 @@ static void calculate_motor_angle(int motor_no,
 	float dist_to_plane, radius;
 	float cos_angle_rad, motor_angle_rad;
 	int motor_pair;
+
+	/*
+	 * transformed_platform_points hentes fra result
+	 */
 
 	motor_pair = MOTOR_PAIRS[motor_no];
 	p_origin = geom->base_points[motor_no];
@@ -225,6 +228,9 @@ static void calculate_motor_angle(int motor_no,
 static void calculate_knee_positions(const struct stewart_geometry *geom,
 				     struct stewart_inverse_result *result)
 {
+	/*
+	 * Henter motorvinkler fra result
+	 */
 	struct mat3 rot_x, rot_y;
 	struct vec3 foot;
 	float y_angle;
@@ -258,20 +264,20 @@ static void calculate_knee_positions(const struct stewart_geometry *geom,
 }
 
 void stewart_kinematics_inverse(const struct stewart_geometry *geom,
-				const struct stewart_pose *pose,
+				const struct stewart_pose *pose_in,
 				struct stewart_inverse_result *result,
 				int debug)
 {
 	int i;
 
-	if (!geom || !pose || !result)
+	if (!geom || !pose_in || !result)
 		return;
 
 	/* Nullstill resultat */
 	memset(result, 0, sizeof(struct stewart_inverse_result));
 
 	/* Transform alle platform punkter med pose */
-	calculate_transformed_platform_points(geom, pose, result);
+	calculate_transformed_platform_points(geom, pose_in, result);
 
 	/* Beregn motor vinkler for alle 6 motorer */
 	for (i = 0; i < 6; i++)
