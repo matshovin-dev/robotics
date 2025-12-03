@@ -26,12 +26,12 @@ void stewart_geometry_print(const struct stewart_geometry *geom)
 		       geom->base_points[i].z);
 	}
 
-	printf("\n  Platform points (flat):\n");
+	printf("\n  Platform points (home position):\n");
 	for (i = 0; i < 6; i++) {
 		printf("    [%d]: (%.2f, %.2f, %.2f)\n", i,
-		       geom->platform_points_flat[i].x,
-		       geom->platform_points_flat[i].y,
-		       geom->platform_points_flat[i].z);
+		       geom->platform_points[i].x,
+		       geom->platform_points[i].y,
+		       geom->platform_points[i].z);
 	}
 }
 
@@ -51,16 +51,17 @@ void stewart_geometry_print(const struct stewart_geometry *geom)
  */
 const struct stewart_geometry ROBOT_MX64 = {
 	/*
-	 * Platform (top plate) attachment points ved null høyde
+	 * Platform (top plate) attachment points ved home-posisjon
 	 * Målt fra SolidWorks og rotert 120°/240° CCW (sett nedenfra)
+	 * y-koordinat er home_height (205mm)
 	 */
-	.platform_points_flat = {
-		{74.91f, 0.0f, 69.65f},   /* 0 - målt fra SolidWorks */
-		{97.77f, 0.0f, 30.05f},   /* 1 - point[5] rotert 120° CCW */
-		{22.86f, 0.0f, -99.70f},  /* 2 - point[0] rotert 120° CCW */
-		{-22.86f, 0.0f, -99.70f}, /* 3 - point[5] rotert 240° CCW */
-		{-97.77f, 0.0f, 30.05f},  /* 4 - point[0] rotert 240° CCW */
-		{-74.91f, 0.0f, 69.65f}   /* 5 - målt fra SolidWorks */
+	.platform_points = {
+		{74.91f, 205.0f, 69.65f},   /* 0 - målt fra SolidWorks */
+		{97.77f, 205.0f, 30.05f},   /* 1 - point[5] rotert 120° CCW */
+		{22.86f, 205.0f, -99.70f},  /* 2 - point[0] rotert 120° CCW */
+		{-22.86f, 205.0f, -99.70f}, /* 3 - point[5] rotert 240° CCW */
+		{-97.77f, 205.0f, 30.05f},  /* 4 - point[0] rotert 240° CCW */
+		{-74.91f, 205.0f, 69.65f}   /* 5 - målt fra SolidWorks */
 	},
 
 	/*
@@ -103,12 +104,12 @@ const struct stewart_geometry ROBOT_MX64 = {
  * Koordinatsystem samme som MX64 versjon.
  */
 const struct stewart_geometry ROBOT_AX18 = {
-	.platform_points_flat = { { 5.50f, 0.0f, 74.72f },
-				  { 67.46f, 0.0f, -32.60f },
-				  { 61.96f, 0.0f, -42.12f },
-				  { -61.96f, 0.0f, -42.12f },
-				  { -67.46f, 0.0f, -32.60f },
-				  { -5.50f, 0.0f, 74.72f } },
+	.platform_points = { { 5.50f, 140.0f, 74.72f },
+			     { 67.46f, 140.0f, -32.60f },
+			     { 61.96f, 140.0f, -42.12f },
+			     { -61.96f, 140.0f, -42.12f },
+			     { -67.46f, 140.0f, -32.60f },
+			     { -5.50f, 140.0f, 74.72f } },
 
 	.base_points = { { 33.29f, 0.0f, 74.87f },
 			 { 81.48f, 0.00f, -8.61f },

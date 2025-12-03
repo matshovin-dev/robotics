@@ -38,13 +38,15 @@ static float soft_clamp(float value, float min, float max, float margin)
  *
  * Roterer platform punkter med ZYX Euler angles og translerer med pose.
  * pose_in inneholder absolutt posisjon i world coordinates.
+ * platform_points er definert ved home-posisjon, så vi trekker fra home_height
+ * før rotasjon for å få lokale koordinater.
  */
 void calculate_transformed_platform_points(
 	const struct stewart_geometry *geom, const struct stewart_pose *pose_in,
 	struct stewart_inverse_result *result)
 {
 	struct mat3 rotation;
-	struct vec3 translation;
+	struct vec3 translation, local_point;
 	int i;
 
 	/* Lag rotasjonsmatrise fra Euler vinkler (ZYX convention) */
@@ -59,8 +61,12 @@ void calculate_transformed_platform_points(
 
 	/* Transform alle platform punkter */
 	for (i = 0; i < 6; i++) {
+		/* Konverter til lokalt koordinatsystem (trekk fra home_height) */
+		local_point = geom->platform_points[i];
+		local_point.y -= geom->home_height;
+
 		/* Roter punkt */
-		mat3_transform_vec3(&rotation, &geom->platform_points_flat[i],
+		mat3_transform_vec3(&rotation, &local_point,
 				    &result->platform_points_transformed[i]);
 
 		/* Translater punkt */

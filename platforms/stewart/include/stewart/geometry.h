@@ -6,8 +6,8 @@
 /**
  * struct stewart_geometry - Stewart platform fysisk geometri
  * @base_points: base attachment points (6) i mm, relativt til base center
- * @platform_points_flat: platform attachment points (6) i mm i XZ-planet (y=0),
- *                        relativt til platform center, før home_height er lagt til
+ * @platform_points: platform attachment points (6) i mm ved home-posisjon,
+ *                   relativt til base center (y = home_height)
  * @home_height: avstand fra base plan til platform plan i neutral posisjon (mm)
  * @short_foot_length: kort ben lengde (mm) - motor arm
  * @long_foot_length: langt ben lengde (mm) - pushrod
@@ -33,7 +33,7 @@
  */
 struct stewart_geometry {
 	struct vec3 base_points[6];
-	struct vec3 platform_points_flat[6];
+	struct vec3 platform_points[6];
 
 	float home_height;
 	float short_foot_length;
