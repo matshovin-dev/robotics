@@ -33,11 +33,11 @@ static float soft_clamp(float value, float min, float max, float margin)
 /**
  * calculate_transformed_platform_points - Transform platform punkter med pose
  * @geom: robot geometri
- * @pose_in: ønsket pose
+ * @pose_in: ønsket pose (absolutt posisjon)
  * @result: output - transformerte platform punkter
  *
  * Roterer platform punkter med ZYX Euler angles og translerer med pose.
- * Inkluderer home_height i translasjon.
+ * pose_in inneholder absolutt posisjon i world coordinates.
  */
 void calculate_transformed_platform_points(
 	const struct stewart_geometry *geom, const struct stewart_pose *pose_in,
@@ -52,9 +52,9 @@ void calculate_transformed_platform_points(
 	mat3_rotate_xyz(&rotation, deg_to_rad(pose_in->rx),
 			deg_to_rad(pose_in->ry), deg_to_rad(pose_in->rz));
 
-	/* Translasjon inkluderer home height */
+	/* Translasjon fra pose (absolutt posisjon) */
 	translation.x = pose_in->tx;
-	translation.y = pose_in->ty + geom->home_height;
+	translation.y = pose_in->ty;
 	translation.z = pose_in->tz;
 
 	/* Transform alle platform punkter */

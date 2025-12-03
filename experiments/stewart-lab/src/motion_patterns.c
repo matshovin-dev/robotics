@@ -198,7 +198,7 @@ int main(void)
 			pose.ry = 0.0f;
 			pose.rz = 0.0f;
 			pose.tx = 0.0f;
-			pose.ty = 0.0f;
+			pose.ty = 205.0f; /* MX64 home_height */
 			pose.tz = 0.0f;
 			break;
 		default:

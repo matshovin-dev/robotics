@@ -104,7 +104,7 @@ generate_reference_motion(float time, const struct stewart_geometry *geometry,
 	ref_pose->rz = 3.0f * sinf(time * 0.3f);
 
 	ref_pose->tx = 10.0f * cosf(time * 0.3f);
-	ref_pose->ty = 15.0f * sinf(time * 0.5f);
+	ref_pose->ty = geometry->home_height + 15.0f * sinf(time * 0.5f);
 	ref_pose->tz = 10.0f * sinf(time * 0.4f);
 
 	/*

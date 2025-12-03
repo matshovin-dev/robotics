@@ -1,17 +1,19 @@
 #include "stewart/pose.h"
+#include "stewart/geometry.h"
 #include <stdio.h>
 #include <string.h>
 
-void stewart_pose_init(struct stewart_pose *pose)
+void stewart_pose_init(struct stewart_pose *pose,
+		       const struct stewart_geometry *geom)
 {
-	if (!pose)
+	if (!pose || !geom)
 		return;
 
 	pose->rx = 0.0f;
 	pose->ry = 0.0f;
 	pose->rz = 0.0f;
 	pose->tx = 0.0f;
-	pose->ty = 0.0f;
+	pose->ty = geom->home_height;
 	pose->tz = 0.0f;
 }
 

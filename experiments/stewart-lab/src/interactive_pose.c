@@ -81,7 +81,7 @@ static void set_home_pose(void)
 	current_pose.ry = 0.0f;
 	current_pose.rz = 0.0f;
 	current_pose.tx = 0.0f;
-	current_pose.ty = 0.0f;
+	current_pose.ty = 205.0f; /* MX64 home_height */
 	current_pose.tz = 0.0f;
 	printf("Reset to home position\n");
 }

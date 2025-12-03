@@ -6,15 +6,13 @@
  * @rx: Roll - rotasjon rundt X-akse (grader)
  * @ry: Pitch - rotasjon rundt Y-akse (grader)
  * @rz: Yaw - rotasjon rundt Z-akse (grader)
- * @tx: X translasjon (mm)
- * @ty: Y translasjon / høyde offset fra home-posisjon (mm)
- * @tz: Z translasjon (mm)
+ * @tx: X translasjon, fra origo (mm)
+ * @ty: Y translasjon, høyde fra origo (mm)
+ * @tz: Z translasjon, fra origo (mm)
  *
- * Representerer platformens posisjon og orientering i 3D rom.
+ * Representerer topp-platformens posisjon og orientering i 3D rom.
  * Alle rotasjoner i grader, alle translasjoner i millimeter.
- *
- * NB: ty er offset fra home-posisjon (ty = 0 betyr platform ved home_height).
- *     Dette gjør pose uavhengig av robottype siden home_height varierer.
+ * Origo er midtpunkt på base-platform i høyde med alle 6 motoraksler.
  *
  * Koordinatsystem:
  *   X+ = Høyre (rød akse)
@@ -31,10 +29,15 @@ struct stewart_pose {
 };
 
 /**
- * stewart_pose_init - Initialiser til null (home posisjon)
+ * stewart_pose_init - Initialiser til home posisjon
  * @pose: pose struktur som skal initialiseres
+ * @geom: robot geometri (for å hente home_height)
+ *
+ * Setter rotasjoner til 0 og ty til home_height for valgt robot.
+ * tx og tz settes også til 0 (platform sentrert over base).
  */
-void stewart_pose_init(struct stewart_pose *pose);
+void stewart_pose_init(struct stewart_pose *pose,
+		       const struct stewart_geometry *geom);
 
 /**
  * stewart_pose_set - Sett pose-verdier

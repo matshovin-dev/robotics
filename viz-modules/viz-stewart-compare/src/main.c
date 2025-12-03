@@ -241,7 +241,7 @@ static void compute_kinematics_for_pose(const struct viz_pose_packet *packet,
 {
 	struct stewart_pose pose;
 
-	stewart_pose_init(&pose);
+	stewart_pose_init(&pose, &geometry);
 	pose.rx = packet->rx;
 	pose.ry = packet->ry;
 	pose.rz = packet->rz;

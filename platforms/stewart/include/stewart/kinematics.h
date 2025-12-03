@@ -78,7 +78,7 @@ void stewart_kinematics_inverse(const struct stewart_geometry *geom,
  * @param[out] result   transformerte platform punkter
  *
  * Roterer platform_points_flat med ZYX Euler angles og translerer med pose_in.
- * platform_points_flat blir også hevet opp med stewart_geometry.home_height.
+ * pose_in inneholder absolutt posisjon (ty er faktisk høyde, ikke offset).
  * Første steg i inverse kinematics.
  * Kan også brukes av forward kinematics for å oppdatere transformerte punkter.
  */
