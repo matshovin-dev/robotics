@@ -65,8 +65,6 @@ struct stewart_forward_result {
  *    - Beregn kne posisjon
  *
  * Motor vinkler blir hard eller soft clamped til geometri-grenser.
- *
- * NB: ty er offset fra home-posisjon (ty = 0 betyr platform ved home_height).
  */
 void stewart_kinematics_inverse(const struct stewart_geometry *geom,
 				const struct stewart_pose *pose_in,
@@ -83,8 +81,6 @@ void stewart_kinematics_inverse(const struct stewart_geometry *geom,
  * platform_points_flat blir også hevet opp med stewart_geometry.home_height.
  * Første steg i inverse kinematics.
  * Kan også brukes av forward kinematics for å oppdatere transformerte punkter.
- *
- * NB: ty er offset fra home-posisjon (ty = 0 betyr platform ved home_height).
  */
 void calculate_transformed_platform_points(
 	const struct stewart_geometry *geom, const struct stewart_pose *pose_in,
@@ -100,8 +96,6 @@ void calculate_transformed_platform_points(
  *
  * Beregner krefter/momenter fra motor-vinkler. Oppdaterer pose basert
  * på fjær-modell. Kalles etter stewart_kinematics_inverse().
- *
- * NB: ty er offset fra home-posisjon (ty = 0 betyr platform ved home_height).
  */
 void stewart_kinematics_forward(const struct stewart_geometry *geom,
 				struct stewart_pose *pose_calc,
@@ -113,8 +107,6 @@ void stewart_kinematics_forward(const struct stewart_geometry *geom,
  * @result: resultat struktur
  *
  * Printer motor vinkler, kne posisjoner og transformerte punkter.
- *
- * NB: ty er offset fra home-posisjon (ty = 0 betyr platform ved home_height).
  */
 void stewart_inverse_result_print(const struct stewart_inverse_result *result);
 
