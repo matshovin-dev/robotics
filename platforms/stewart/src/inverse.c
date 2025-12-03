@@ -1,11 +1,13 @@
+#include "stewart/kinematics.h"
+
 #include "robotics/math/geometry.h"
 #include "robotics/math/matrix.h"
 #include "robotics/math/utils.h"
 #include "robotics/math/vec3.h"
+
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
-#include <stewart/kinematics.h>
 #include <string.h>
 
 /* Motor par for plan-definisjon */

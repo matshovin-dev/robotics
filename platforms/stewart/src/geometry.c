@@ -1,4 +1,5 @@
 #include "stewart/geometry.h"
+
 #include <assert.h>
 #include <stdio.h>
 

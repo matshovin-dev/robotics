@@ -2,8 +2,8 @@
 #define STEWART_KINEMATICS_H
 
 #include "robotics/math/vec3.h"
-#include <stewart/geometry.h>
-#include <stewart/pose.h>
+#include "stewart/geometry.h"
+#include "stewart/pose.h"
 
 /**
  * struct stewart_inverse_result - Inverse kinematics resultat

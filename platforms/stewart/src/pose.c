@@ -1,5 +1,7 @@
 #include "stewart/pose.h"
+
 #include "stewart/geometry.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>

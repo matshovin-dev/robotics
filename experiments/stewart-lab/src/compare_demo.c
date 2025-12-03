@@ -1,4 +1,8 @@
+#include "stewart/geometry.h"
+#include "stewart/kinematics.h"
+#include "stewart/pose.h"
 #include "viz_protocol.h"
+
 #include <arpa/inet.h>
 #include <math.h>
 #include <netinet/in.h>
@@ -7,9 +11,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <stewart/geometry.h>
-#include <stewart/kinematics.h>
-#include <stewart/pose.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f

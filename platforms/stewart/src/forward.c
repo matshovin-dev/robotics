@@ -1,8 +1,10 @@
+#include "stewart/kinematics.h"
+
+#include "robotics/math/vec3.h"
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
-#include <stewart/kinematics.h>
-#include "robotics/math/vec3.h"
 
 /* Simulerings-parametere for fjær-modell */
 static const float SPRING_K = 0.6f; /* Fjærkonstant */
