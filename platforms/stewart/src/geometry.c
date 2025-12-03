@@ -1,14 +1,10 @@
 #include "stewart/geometry.h"
+#include <assert.h>
 #include <stdio.h>
 
 void stewart_geometry_print(const struct stewart_geometry *geom)
 {
-	int i;
-
-	if (!geom) {
-		printf("stewart_geometry: NULL\n");
-		return;
-	}
+	assert(geom != NULL);
 
 	printf("stewart_geometry:\n");
 	printf("  Home height: %.2f mm\n", geom->home_height);
@@ -20,17 +16,16 @@ void stewart_geometry_print(const struct stewart_geometry *geom)
 	       geom->max_pose_translation_amplitude);
 
 	printf("\n  Base points:\n");
-	for (i = 0; i < 6; i++) {
+	for (int i = 0; i < 6; i++) {
 		printf("    [%d]: (%.2f, %.2f, %.2f)\n", i,
 		       geom->base_points[i].x, geom->base_points[i].y,
 		       geom->base_points[i].z);
 	}
 
 	printf("\n  Platform points (home position):\n");
-	for (i = 0; i < 6; i++) {
+	for (int i = 0; i < 6; i++) {
 		printf("    [%d]: (%.2f, %.2f, %.2f)\n", i,
-		       geom->platform_points[i].x,
-		       geom->platform_points[i].y,
+		       geom->platform_points[i].x, geom->platform_points[i].y,
 		       geom->platform_points[i].z);
 	}
 }
@@ -43,6 +38,8 @@ void stewart_geometry_print(const struct stewart_geometry *geom)
  *
  * Motor nummerering 0-5 i CCW rekkefølge sett ovenfra.
  * Motorer delt i to grupper (024 og 135) pga speil-montering.
+ *
+ * Origo ligger i platform base i høyde med de 8 motorakslene (base_point)
  *
  * Koordinatsystem:
  *   X+ = Høyre

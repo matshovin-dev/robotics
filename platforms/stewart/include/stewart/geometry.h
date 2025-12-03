@@ -7,7 +7,7 @@
  * struct stewart_geometry - Stewart platform fysisk geometri
  * @base_points: base attachment points (6) i mm, relativt til base center
  * @platform_points: platform attachment points (6) i mm ved home-posisjon,
- *                   relativt til base center (y = home_height)
+ *                   (y = home_height)
  * @home_height: avstand fra base plan til platform plan i neutral posisjon (mm)
  * @short_foot_length: kort ben lengde (mm) - motor arm
  * @long_foot_length: langt ben lengde (mm) - pushrod
@@ -26,14 +26,16 @@
  * spesifikk Stewart platform konfigurasjon. Robot-spesifikk men
  * motor-agnostisk (fungerer med alle aktuator-typer).
  *
+ * Origo ligger i platform base i høyde med de 8 motorakslene (base_point).
+ *
  * Motor layout (sett ovenfra, CCW nummerering):
- *     3     2
+ *    3     2
  *   4       1
  *      5 0
  */
 struct stewart_geometry {
-	struct vec3 base_points[6];
-	struct vec3 platform_points[6];
+	struct vec3 base_points[6]; /* Ligger i y = 0 */
+	struct vec3 platform_points[6]; /* Ligger i y = home_hight */
 
 	float home_height;
 	float short_foot_length;

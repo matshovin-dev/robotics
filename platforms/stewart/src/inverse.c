@@ -2,6 +2,7 @@
 #include "robotics/math/matrix.h"
 #include "robotics/math/utils.h"
 #include "robotics/math/vec3.h"
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stewart/kinematics.h>
@@ -276,8 +277,9 @@ void stewart_kinematics_inverse(const struct stewart_geometry *geom,
 {
 	int i;
 
-	if (!geom || !pose_in || !result)
-		return;
+	assert(geom != NULL);
+	assert(pose_in != NULL);
+	assert(result != NULL);
 
 	/* Nullstill resultat */
 	memset(result, 0, sizeof(struct stewart_inverse_result));
@@ -297,10 +299,7 @@ void stewart_inverse_result_print(const struct stewart_inverse_result *result)
 {
 	int i;
 
-	if (!result) {
-		printf("stewart_inverse_result: NULL\n");
-		return;
-	}
+	assert(result != NULL);
 
 	printf("stewart_inverse_result:\n");
 	printf("  Error: %d\n", result->error);

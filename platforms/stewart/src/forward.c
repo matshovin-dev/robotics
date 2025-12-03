@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <stewart/kinematics.h>
@@ -106,8 +107,10 @@ void stewart_kinematics_forward(const struct stewart_geometry *geom,
 {
 	struct vec3 total_force, total_moment;
 
-	if (!geom || !pose_calc || !result_inv || !result_forv)
-		return;
+	assert(geom != NULL);
+	assert(pose_calc != NULL);
+	assert(result_inv != NULL);
+	assert(result_forv != NULL);
 
 	/* Beregn kraftvektorer fra benlengde-avvik */
 	calculate_leg_forces(geom, result_inv, result_forv);
@@ -148,10 +151,7 @@ void stewart_forward_result_print(const struct stewart_forward_result *result)
 {
 	int i;
 
-	if (!result) {
-		printf("stewart_forward_result: NULL\n");
-		return;
-	}
+	assert(result != NULL);
 
 	printf("stewart_forward_result:\n");
 	printf("  Total force: (%.2f, %.2f, %.2f)\n", result->total_force.x,

@@ -1,6 +1,9 @@
 #ifndef STEWART_POSE_H
 #define STEWART_POSE_H
 
+/* Forward declaration */
+struct stewart_geometry;
+
 /**
  * struct stewart_pose - Platform pose (6 graders frihet)
  * @rx: Roll - rotasjon rundt X-akse (grader)
@@ -40,7 +43,7 @@ void stewart_pose_init(struct stewart_pose *pose,
 		       const struct stewart_geometry *geom);
 
 /**
- * stewart_pose_set - Sett pose-verdier
+ * stewart_pose_set - Sett pose-verdier manuelt
  * @pose: pose struktur
  * @rx: roll vinkel (grader)
  * @ry: pitch vinkel (grader)
