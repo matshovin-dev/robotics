@@ -1,10 +1,8 @@
 #include "stewart/kinematics.h"
-
 #include "robotics/math/geometry.h"
 #include "robotics/math/matrix.h"
 #include "robotics/math/utils.h"
 #include "robotics/math/vec3.h"
-
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -13,44 +11,12 @@
 /* Motor par for plan-definisjon */
 static const int MOTOR_PAIRS[6] = { 1, 0, 3, 2, 5, 4 };
 
-/**
- * soft_clamp - Soft clamp med dampening nær grenser
- * @value: verdi som skal clampes
- * @min: minimum verdi
- * @max: maximum verdi
- * @margin: margin for soft dampening
- *
- * Retur: clamped verdi
- */
-static float soft_clamp(float value, float min, float max, float margin)
-{
-	if (value < min)
-		return min;
-	if (value > max)
-		return max;
-
-	/* Soft dampening nær grenser (ikke implementert enda) */
-	return value;
-}
-
-/**
- * calculate_transformed_platform_points - Transform platform punkter med pose
- * @geom: robot geometri
- * @pose_in: ønsket pose (absolutt posisjon)
- * @result: output - transformerte platform punkter
- *
- * Roterer platform punkter med ZYX Euler angles og translerer med pose.
- * pose_in inneholder absolutt posisjon i world coordinates.
- * platform_points er definert ved home-posisjon, så vi trekker fra home_height
- * før rotasjon for å få lokale koordinater.
- */
 void calculate_transformed_platform_points(
 	const struct stewart_geometry *geom, const struct stewart_pose *pose_in,
-	struct stewart_inverse_result *result)
+	struct stewart_inverse_result *result_out)
 {
 	struct mat3 rotation;
 	struct vec3 translation, local_point;
-	int i;
 
 	/* Lag rotasjonsmatrise fra Euler vinkler (ZYX convention) */
 	mat3_identity(&rotation);
@@ -63,29 +29,51 @@ void calculate_transformed_platform_points(
 	translation.z = pose_in->tz;
 
 	/* Transform alle platform punkter */
-	for (i = 0; i < 6; i++) {
-		/* Konverter til lokalt koordinatsystem (trekk fra home_height) */
-		local_point = geom->platform_points[i];
+	for (int i = 0; i < 6; i++) {
+		/* Konverter til lokalt koordinatsystem (trekk fra home_height)
+		 */
+		local_point = geom->platform_home_points[i];
 		local_point.y -= geom->home_height;
 
 		/* Roter punkt */
-		mat3_transform_vec3(&rotation, &local_point,
-				    &result->platform_points_transformed[i]);
+		mat3_transform_vec3(
+			&rotation, &local_point,
+			&result_out->platform_points_transformed[i]);
 
 		/* Translater punkt */
-		vec3_add(&result->platform_points_transformed[i], &translation,
-			 &result->platform_points_transformed[i]);
+		vec3_add(&result_out->platform_points_transformed[i],
+			 &translation,
+			 &result_out->platform_points_transformed[i]);
 	}
 }
 
 /**
- * calculate_motor_angle - Beregn motor vinkel for én motor
- * @motor_no: motor nummer (0-5)
- * @geom: robot geometri
- * @result: inverse kinematics resultat (input/output)
- * @debug: 1 = print debug info
+ * @function calculate_motor_angle
+ * @api STATIC
  *
- * Beregner motor vinkel fra transformert platform punkt.
+ * @input  motor_no                                       int (0-5)
+ * @input  geom->base_points[6]                           struct vec3 (mm)
+ * @input  geom->short_foot_length                        float (mm)
+ * @input  geom->long_foot_length                         float (mm)
+ * @input  geom->motor_arm_outward                        int
+ * @input  geom->max/min_motor_angle_024/135_deg          float (degrees)
+ * @input  geom->motor_clamp_limit_angle_deg              float (degrees)
+ * @input  result_in_out->platform_points_transformed[6]  struct vec3 (mm)
+ * @input  debug                                          int (1=print, 0=silent)
+ *
+ * @output result_in_out->motor_angles_deg[motor_no]      float (degrees)
+ * @output result_in_out->knee_points[motor_no]           struct vec3 (mm)
+ * @output result_in_out->error                           int (0=success, 1=NaN)
+ *
+ * Beregner motor vinkel og knepunkt for én motor fra transformert platform punkt.
+ *
+ * Algoritme:
+ * 1. Opprett 2D plan for motor (X-akse = motor par retning, Y-akse = opp)
+ * 2. Projiser platform punkt på 2D plan
+ * 3. Beregn avstand og vinkel fra motor til projeksjon
+ * 4. Bruk cosinus-setningen for å finne motor vinkel
+ * 5. Clamp vinkel til geometri-grenser (hard eller soft)
+ * 6. Beregn knepunkt posisjon
  *
  * 2D plan sett fra utsiden av hver motor (alle vinkler starter ved y- CCW):
  *
@@ -103,7 +91,7 @@ void calculate_transformed_platform_points(
  */
 static void calculate_motor_angle(int motor_no,
 				  const struct stewart_geometry *geom,
-				  struct stewart_inverse_result *result,
+				  struct stewart_inverse_result *result_in_out,
 				  int debug)
 {
 	struct vec3 v_x_axis_2d, v_y_axis_2d;
@@ -139,8 +127,8 @@ static void calculate_motor_angle(int motor_no,
 	v_y_axis_2d = (struct vec3){ 0.0f, 1.0f, 0.0f };
 
 	/* Projiser platform punkt på 2D plan */
-	vec3_sub(&result->platform_points_transformed[motor_no], &p_origin,
-		 &relative);
+	vec3_sub(&result_in_out->platform_points_transformed[motor_no],
+		 &p_origin, &relative);
 
 	p_pro_x = vec3_dot(&relative, &v_x_axis_2d);
 	p_pro_y = relative.y; /* Enklere enn dot siden Y-akse er (0,1,0) */
@@ -157,8 +145,8 @@ static void calculate_motor_angle(int motor_no,
 	 */
 	vec3_cross(&v_x_axis_2d, &v_y_axis_2d, &normal);
 	dist_to_plane = distance_point_to_plane(
-		&result->platform_points_transformed[motor_no], &p_origin,
-		&normal);
+		&result_in_out->platform_points_transformed[motor_no],
+		&p_origin, &normal);
 
 	/*
 	 * Beregn radius av servo arm sirkel på plan
@@ -210,32 +198,44 @@ static void calculate_motor_angle(int motor_no,
 	}
 
 	/* Konverter til grader */
-	result->motor_angles_deg[motor_no] = rad_to_deg(motor_angle_rad);
+	result_in_out->motor_angles_deg[motor_no] = rad_to_deg(motor_angle_rad);
 
 	/* Hard clamp til geometri-grenser */
 	if (motor_no & 1) { /* 1, 3, 5 */
-		result->motor_angles_deg[motor_no] =
-			soft_clamp(result->motor_angles_deg[motor_no],
+		result_in_out->motor_angles_deg[motor_no] =
+			soft_clamp(result_in_out->motor_angles_deg[motor_no],
 				   geom->min_motor_angle_135_deg,
 				   geom->max_motor_angle_135_deg, 10.0f);
 	} else { /* 0, 2, 4 */
-		result->motor_angles_deg[motor_no] =
-			soft_clamp(result->motor_angles_deg[motor_no],
+		result_in_out->motor_angles_deg[motor_no] =
+			soft_clamp(result_in_out->motor_angles_deg[motor_no],
 				   geom->min_motor_angle_024_deg,
 				   geom->max_motor_angle_024_deg, 10.0f);
 	}
 }
 
 /**
- * calculate_knee_positions - Beregn kne posisjoner fra motor vinkler
- * @geom: robot geometri
- * @result: inverse kinematics resultat (input/output)
+ * @function calculate_knee_positions
+ * @api STATIC
+ *
+ * @input  geom->base_points[6]                      struct vec3 (mm)
+ * @input  geom->short_foot_length                   float (mm)
+ * @input  result_in_out->motor_angles_deg[6]        float (degrees)
+ *
+ * @output result_in_out->knee_points[6]             struct vec3 (mm)
  *
  * Beregner 3D posisjon av hvert kne basert på motor vinkel.
  * Kne er der servo arm møter pushrod.
+ *
+ * Algoritme:
+ * 1. Start med foot pekende rett ned fra origo
+ * 2. Roter rundt X-akse med motor vinkel
+ * 3. Roter rundt Y-akse til motor posisjon
+ * 4. Translater til motor base point
  */
-static void calculate_knee_positions(const struct stewart_geometry *geom,
-				     struct stewart_inverse_result *result)
+static void
+calculate_knee_positions(const struct stewart_geometry *geom,
+			 struct stewart_inverse_result *result_in_out)
 {
 	/*
 	 * Henter motorvinkler fra result
@@ -251,8 +251,9 @@ static void calculate_knee_positions(const struct stewart_geometry *geom,
 
 		/* Roter rundt X-akse med motor vinkel */
 		mat3_identity(&rot_x);
-		mat3_rotate_x(&rot_x,
-			      deg_to_rad(result->motor_angles_deg[motor_no]));
+		mat3_rotate_x(
+			&rot_x,
+			deg_to_rad(result_in_out->motor_angles_deg[motor_no]));
 		mat3_transform_vec3(&rot_x, &foot, &foot);
 
 		/* Roter rundt Y-akse til motor posisjon */
@@ -268,35 +269,41 @@ static void calculate_knee_positions(const struct stewart_geometry *geom,
 
 		/* Translater til motor posisjon (world coordinates) */
 		vec3_add(&foot, &geom->base_points[motor_no],
-			 &result->knee_points[motor_no]);
+			 &result_in_out->knee_points[motor_no]);
 	}
 }
 
+/*
+ * Entry point for KI
+ */
 void stewart_kinematics_inverse(const struct stewart_geometry *geom,
 				const struct stewart_pose *pose_in,
-				struct stewart_inverse_result *result,
+				struct stewart_inverse_result *result_in_out,
 				int debug)
 {
 	int i;
 
 	assert(geom != NULL);
 	assert(pose_in != NULL);
-	assert(result != NULL);
+	assert(result_in_out != NULL);
 
 	/* Nullstill resultat */
-	memset(result, 0, sizeof(struct stewart_inverse_result));
+	memset(result_in_out, 0, sizeof(struct stewart_inverse_result));
 
 	/* Transform alle platform punkter med pose */
-	calculate_transformed_platform_points(geom, pose_in, result);
+	calculate_transformed_platform_points(geom, pose_in, result_in_out);
 
 	/* Beregn motor vinkler for alle 6 motorer */
 	for (i = 0; i < 6; i++)
-		calculate_motor_angle(i, geom, result, debug);
+		calculate_motor_angle(i, geom, result_in_out, debug);
 
 	/* Beregn kne posisjoner */
-	calculate_knee_positions(geom, result);
+	calculate_knee_positions(geom, result_in_out);
 }
 
+/*
+ * printings
+ */
 void stewart_inverse_result_print(const struct stewart_inverse_result *result)
 {
 	int i;

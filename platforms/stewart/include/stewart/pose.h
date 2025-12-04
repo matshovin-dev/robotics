@@ -6,21 +6,23 @@ struct stewart_geometry;
 
 /**
  * struct stewart_pose - Platform pose (6 graders frihet)
- * @rx: Roll - rotasjon rundt X-akse (grader)
- * @ry: Pitch - rotasjon rundt Y-akse (grader)
- * @rz: Yaw - rotasjon rundt Z-akse (grader)
- * @tx: X translasjon, fra origo (mm)
- * @ty: Y translasjon, høyde fra origo (mm)
- * @tz: Z translasjon, fra origo (mm)
+ *
+ * @rx float (deg) - Roll (rotasjon rundt X-akse)
+ * @ry float (deg) - Pitch (rotasjon rundt Y-akse)
+ * @rz float (deg) - Yaw (rotasjon rundt Z-akse)
+ * @tx float (mm) - X translasjon fra origo
+ * @ty float (mm) - Y translasjon (høyde fra origo)
+ * @tz float (mm) - Z translasjon fra origo
  *
  * Representerer topp-platformens posisjon og orientering i 3D rom.
- * Alle rotasjoner i grader, alle translasjoner i millimeter.
- * Origo er midtpunkt på base-platform i høyde med alle 6 motoraksler.
+ * Origo er midtpunkt på base-platform ved motoraksel-høyde.
  *
  * Koordinatsystem:
  *   X+ = Høyre (rød akse)
  *   Y+ = Opp (grønn akse)
- *   Z+ = Ut av skjermen, vekk fra betrakter (blå akse)
+ *   Z+ = Ut av skjermen (blå akse)
+ *
+ * @note En pose er uavhengig av platformens home posisjon
  */
 struct stewart_pose {
 	float rx;
@@ -32,9 +34,13 @@ struct stewart_pose {
 };
 
 /**
- * stewart_pose_init - Initialiser til home posisjon
- * @pose: pose struktur som skal initialiseres
- * @geom: robot geometri (for å hente home_height)
+ * @function stewart_pose_init
+ * @api PUBLIC
+ *
+ * @input  geom->home_height  float (mm)
+ *
+ * @output pose->{rx,ry,rz}   float (0 degrees)
+ * @output pose->{tx,ty,tz}   float (0, home_height, 0 mm)
  *
  * Setter rotasjoner til 0 og ty til home_height for valgt robot.
  * tx og tz settes også til 0 (platform sentrert over base).
@@ -43,31 +49,51 @@ void stewart_pose_init(struct stewart_pose *pose,
 		       const struct stewart_geometry *geom);
 
 /**
- * stewart_pose_set - Sett pose-verdier manuelt
- * @pose: pose struktur
- * @rx: roll vinkel (grader)
- * @ry: pitch vinkel (grader)
- * @rz: yaw vinkel (grader)
- * @tx: X translasjon (mm)
- * @ty: Y translasjon (mm)
- * @tz: Z translasjon (mm)
+ * @function stewart_pose_set
+ * @api PUBLIC
+ *
+ * @input  rx  float (degrees)
+ * @input  ry  float (degrees)
+ * @input  rz  float (degrees)
+ * @input  tx  float (mm)
+ * @input  ty  float (mm)
+ * @input  tz  float (mm)
+ *
+ * @output pose->{rx,ry,rz}  float (degrees)
+ * @output pose->{tx,ty,tz}  float (mm)
+ *
+ * Setter alle pose-verdier manuelt.
+ *
+ * @note Husk å sette ty høy nok for å unngå kollisjon med base
  */
 void stewart_pose_set(struct stewart_pose *pose, float rx, float ry, float rz,
 		      float tx, float ty, float tz);
 
 /**
- * stewart_pose_copy - Kopier pose fra kilde til destinasjon
- * @dest: destinasjon pose
- * @src: kilde pose
+ * @function stewart_pose_copy
+ * @api PUBLIC
+ *
+ * @input  src->{rx,ry,rz}   float (degrees)
+ * @input  src->{tx,ty,tz}   float (mm)
+ *
+ * @output dest->{rx,ry,rz}  float (degrees)
+ * @output dest->{tx,ty,tz}  float (mm)
+ *
+ * Kopierer alle pose-verdier fra src til dest.
  */
 void stewart_pose_copy(struct stewart_pose *dest,
 		       const struct stewart_pose *src);
 
 /**
- * stewart_pose_print - Print pose til stdout
- * @pose: pose som skal printes
+ * @function stewart_pose_print
+ * @api PUBLIC
  *
- * Printer rotasjon og posisjon for debugging.
+ * @input  pose->{rx,ry,rz}  float (degrees)
+ * @input  pose->{tx,ty,tz}  float (mm)
+ *
+ * @output stdout  Formatted text output
+ *
+ * Printer rotasjon og posisjon til stdout for debugging.
  */
 void stewart_pose_print(const struct stewart_pose *pose);
 

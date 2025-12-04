@@ -11,19 +11,55 @@
 #endif
 
 /**
- * deg_to_rad - Konverter grader til radianer
- * @degrees: vinkel i grader
+ * @function deg_to_rad
+ * @api PUBLIC
  *
- * Retur: vinkel i radianer
+ * @input  degrees  float (degrees)
+ * @output return   float (radians)
+ *
+ * Konverterer vinkel fra grader til radianer.
  */
 float deg_to_rad(float degrees);
 
 /**
- * rad_to_deg - Konverter radianer til grader
- * @radians: vinkel i radianer
+ * @function rad_to_deg
+ * @api PUBLIC
  *
- * Retur: vinkel i grader
+ * @input  radians  float (radians)
+ * @output return   float (degrees)
+ *
+ * Konverterer vinkel fra radianer til grader.
  */
 float rad_to_deg(float radians);
+
+/**
+ * @function clamp
+ * @api PUBLIC
+ *
+ * @input  value   float
+ * @input  min     float
+ * @input  max     float
+ * @output return  float (clamped to [min, max])
+ *
+ * Begrenser verdi til området [min, max].
+ * Hard clamp uten dampening.
+ */
+float clamp(float value, float min, float max);
+
+/**
+ * @function soft_clamp
+ * @api PUBLIC
+ *
+ * @input  value   float
+ * @input  min     float
+ * @input  max     float
+ * @input  margin  float
+ * @output return  float (soft clamped)
+ *
+ * Soft clamp med eksponentiell dampening nær grenser.
+ * Innenfor margin-området: smooth dampening.
+ * Utenfor margin: hard clamp.
+ */
+float soft_clamp(float value, float min, float max, float margin);
 
 #endif /* ROBOTICS_MATH_UTILS_H */

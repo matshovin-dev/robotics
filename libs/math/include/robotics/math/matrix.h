@@ -5,79 +5,118 @@
 
 /**
  * struct mat3 - 3x3 rotasjonsmatrise
- * @m: matrise-elementer i column-major order
  *
- * Layout:
- * m[0]  m[3]  m[6]
- * m[1]  m[4]  m[7]
- * m[2]  m[5]  m[8]
+ * @m[9] float - Matrise-elementer i column-major order
+ *
+ * Representerer 3x3 rotasjonsmatrise for 3D transformasjoner.
+ *
+ * Layout (column-major):
+ *   m[0]  m[3]  m[6]
+ *   m[1]  m[4]  m[7]
+ *   m[2]  m[5]  m[8]
+ *
+ * @note Column-major: kolonner sammenhengende i minnet
  */
 struct mat3 {
 	float m[9];
 };
 
 /**
- * mat3_identity - Initialiser til identitetsmatrise
- * @mat: matrise som skal initialiseres
+ * @function mat3_identity
+ * @api PUBLIC
+ *
+ * @output mat->m[9]  float (identity matrix)
+ *
+ * Initialiserer til identitetsmatrise (I).
  */
 void mat3_identity(struct mat3 *mat);
 
 /**
- * mat3_rotate_x - Roter rundt X-aksen
- * @mat: matrise som skal roteres (modifiseres in-place)
- * @angle_rad: rotasjonsvinkel i radianer
+ * @function mat3_rotate_x
+ * @api PUBLIC
+ *
+ * @input  mat->m[9]   float
+ * @input  angle_rad   float (radians)
+ * @output mat->m[9]   float (rotated)
+ *
+ * Roterer matrise rundt X-aksen (in-place).
  */
 void mat3_rotate_x(struct mat3 *mat, float angle_rad);
 
 /**
- * mat3_rotate_y - Roter rundt Y-aksen
- * @mat: matrise som skal roteres (modifiseres in-place)
- * @angle_rad: rotasjonsvinkel i radianer
+ * @function mat3_rotate_y
+ * @api PUBLIC
+ *
+ * @input  mat->m[9]   float
+ * @input  angle_rad   float (radians)
+ * @output mat->m[9]   float (rotated)
+ *
+ * Roterer matrise rundt Y-aksen (in-place).
  */
 void mat3_rotate_y(struct mat3 *mat, float angle_rad);
 
 /**
- * mat3_rotate_z - Roter rundt Z-aksen
- * @mat: matrise som skal roteres (modifiseres in-place)
- * @angle_rad: rotasjonsvinkel i radianer
+ * @function mat3_rotate_z
+ * @api PUBLIC
+ *
+ * @input  mat->m[9]   float
+ * @input  angle_rad   float (radians)
+ * @output mat->m[9]   float (rotated)
+ *
+ * Roterer matrise rundt Z-aksen (in-place).
  */
 void mat3_rotate_z(struct mat3 *mat, float angle_rad);
 
 /**
- * mat3_rotate_xyz - Roter rundt alle akser (Euler angles)
- * @mat: matrise som skal roteres (modifiseres in-place)
- * @x_rad: rotasjon rundt X-akse i radianer
- * @y_rad: rotasjon rundt Y-akse i radianer
- * @z_rad: rotasjon rundt Z-akse i radianer
+ * @function mat3_rotate_xyz
+ * @api PUBLIC
  *
+ * @input  mat->m[9]  float
+ * @input  x_rad      float (radians)
+ * @input  y_rad      float (radians)
+ * @input  z_rad      float (radians)
+ * @output mat->m[9]  float (rotated by Euler angles)
+ *
+ * Roterer matrise rundt alle akser med Euler angles (in-place).
  * Rotasjonsrekkefølge: Z, deretter Y, deretter X (ZYX convention)
  */
 void mat3_rotate_xyz(struct mat3 *mat, float x_rad, float y_rad, float z_rad);
 
 /**
- * mat3_transform_vec3 - Roter vektor med matrise
- * @mat: rotasjonsmatrise
- * @in: input vektor
- * @out: output vektor (rotert)
+ * @function mat3_transform_vec3
+ * @api PUBLIC
+ *
+ * @input  mat->m[9]     float
+ * @input  in->{x,y,z}   float
+ * @output out->{x,y,z}  float (rotated vector)
+ *
+ * Roterer vektor med matrise: out = mat * in
  */
 void mat3_transform_vec3(const struct mat3 *mat, const struct vec3 *in,
 			 struct vec3 *out);
 
 /**
- * mat3_multiply - Multipliser to matriser
- * @a: første matrise
- * @b: andre matrise
- * @result: resultat-matrise (a * b)
+ * @function mat3_multiply
+ * @api PUBLIC
+ *
+ * @input  a->m[9]       float
+ * @input  b->m[9]       float
+ * @output result->m[9]  float (a * b)
+ *
+ * Multipliserer to matriser: result = a * b
  */
 void mat3_multiply(const struct mat3 *a, const struct mat3 *b,
 		   struct mat3 *result);
 
 /**
- * mat3_transpose - Transposer matrise
- * @mat: matrise som skal transponeres
- * @result: transponert matrise
+ * @function mat3_transpose
+ * @api PUBLIC
  *
- * For rotasjonsmatriser er transpose = inverse
+ * @input  mat->m[9]     float
+ * @output result->m[9]  float (transposed)
+ *
+ * Transponerer matrise: result = mat^T
+ * For rotasjonsmatriser: transpose = inverse
  */
 void mat3_transpose(const struct mat3 *mat, struct mat3 *result);
 

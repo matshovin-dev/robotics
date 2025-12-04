@@ -3,9 +3,12 @@
 
 /**
  * struct vec3 - 3D vektor
- * @x: X-komponent
- * @y: Y-komponent
- * @z: Z-komponent
+ *
+ * @x float - X-komponent
+ * @y float - Y-komponent
+ * @z float - Z-komponent
+ *
+ * Representerer punkt eller retning i 3D rom.
  */
 struct vec3 {
 	float x;
@@ -14,41 +17,60 @@ struct vec3 {
 };
 
 /**
- * vec3_length - Beregn lengden av vektor
- * @v: input vektor
+ * @function vec3_length
+ * @api PUBLIC
  *
- * Retur: lengden av vektoren (sqrt(x² + y² + z²))
+ * @input  v->{x,y,z}  float
+ * @output return      float
+ *
+ * Beregner lengden av vektor (sqrt(x² + y² + z²)).
  */
 float vec3_length(const struct vec3 *v);
 
 /**
- * vec3_length_squared - Beregn lengde i kvadrat (uten sqrt)
- * @v: input vektor
+ * @function vec3_length_squared
+ * @api PUBLIC
  *
+ * @input  v->{x,y,z}  float
+ * @output return      float
+ *
+ * Beregner lengde i kvadrat (x² + y² + z²), uten sqrt.
  * Raskere enn vec3_length() når man kun trenger å sammenligne lengder.
- *
- * Retur: lengde kvadrert (x² + y² + z²)
  */
 float vec3_length_squared(const struct vec3 *v);
 
 /**
- * vec3_normalize - Normaliser vektor til lengde 1
- * @v: vektor som skal normaliseres (modifiseres in-place)
+ * @function vec3_normalize
+ * @api PUBLIC
  *
+ * @input  v->{x,y,z}  float
+ * @output v->{x,y,z}  float (normalized to length 1)
+ *
+ * Normaliserer vektor til lengde 1 (in-place).
  * Hvis vektoren har lengde 0, endres den ikke.
  */
 void vec3_normalize(struct vec3 *v);
 
 /**
- * vec3_scale - Skaler vektor med faktor
- * @v: vektor som skal skaleres (modifiseres in-place)
- * @s: skaleringsfaktor
+ * @function vec3_scale
+ * @api PUBLIC
+ *
+ * @input  v->{x,y,z}  float
+ * @input  s           float
+ * @output v->{x,y,z}  float (scaled by s)
+ *
+ * Skalerer vektor med faktor s (in-place).
  */
 void vec3_scale(struct vec3 *v, float s);
 
 /**
- * vec3_negate - Inverter vektor (multipliser med -1)
- * @v: vektor som skal inverteres (modifiseres in-place)
+ * @function vec3_negate
+ * @api PUBLIC
+ *
+ * @input  v->{x,y,z}  float
+ * @output v->{x,y,z}  float (negated)
+ *
+ * Inverterer vektor - multipliserer med -1 (in-place).
  */
 void vec3_negate(struct vec3 *v);
 
@@ -57,58 +79,77 @@ void vec3_negate(struct vec3 *v);
  */
 
 /**
- * vec3_add - Legg sammen to vektorer
- * @a: første vektor
- * @b: andre vektor
- * @out: output vektor (a + b)
+ * @function vec3_add
+ * @api PUBLIC
+ *
+ * @input  a->{x,y,z}    float
+ * @input  b->{x,y,z}    float
+ * @output out->{x,y,z}  float (a + b)
+ *
+ * Legger sammen to vektorer: out = a + b
  */
 void vec3_add(const struct vec3 *a, const struct vec3 *b, struct vec3 *out);
 
 /**
- * vec3_sub - Trekk fra to vektorer
- * @a: første vektor
- * @b: andre vektor
- * @out: output vektor (a - b)
+ * @function vec3_sub
+ * @api PUBLIC
+ *
+ * @input  a->{x,y,z}    float
+ * @input  b->{x,y,z}    float
+ * @output out->{x,y,z}  float (a - b)
+ *
+ * Trekker fra to vektorer: out = a - b
  */
 void vec3_sub(const struct vec3 *a, const struct vec3 *b, struct vec3 *out);
 
 /**
- * vec3_dot - Beregn dot product (scalar product)
- * @a: første vektor
- * @b: andre vektor
+ * @function vec3_dot
+ * @api PUBLIC
  *
- * Retur: dot product (a·b = ax*bx + ay*by + az*bz)
+ * @input  a->{x,y,z}  float
+ * @input  b->{x,y,z}  float
+ * @output return      float (a·b)
+ *
+ * Beregner dot product (scalar product): a·b = ax*bx + ay*by + az*bz
  */
 float vec3_dot(const struct vec3 *a, const struct vec3 *b);
 
 /**
- * vec3_cross - Beregn cross product
- * @a: første vektor
- * @b: andre vektor
- * @out: output vektor (a × b)
+ * @function vec3_cross
+ * @api PUBLIC
  *
+ * @input  a->{x,y,z}    float
+ * @input  b->{x,y,z}    float
+ * @output out->{x,y,z}  float (a × b)
+ *
+ * Beregner cross product: out = a × b
  * Cross product står vinkelrett på både a og b.
  */
 void vec3_cross(const struct vec3 *a, const struct vec3 *b, struct vec3 *out);
 
 /**
- * vec3_distance - Beregn avstand mellom to punkter
- * @a: første punkt
- * @b: andre punkt
+ * @function vec3_distance
+ * @api PUBLIC
  *
- * Retur: euklidsk avstand mellom a og b
+ * @input  a->{x,y,z}  float
+ * @input  b->{x,y,z}  float
+ * @output return      float
+ *
+ * Beregner euklidsk avstand mellom to punkter.
  */
 float vec3_distance(const struct vec3 *a, const struct vec3 *b);
 
 /**
- * vec3_distance_squared - Beregn avstand i kvadrat (uten sqrt)
- * @a: første punkt
- * @b: andre punkt
+ * @function vec3_distance_squared
+ * @api PUBLIC
  *
+ * @input  a->{x,y,z}  float
+ * @input  b->{x,y,z}  float
+ * @output return      float
+ *
+ * Beregner avstand i kvadrat, uten sqrt.
  * Raskere enn vec3_distance() når man kun trenger å sammenligne avstander.
- *
- * Retur: avstand i kvadrat
  */
 float vec3_distance_squared(const struct vec3 *a, const struct vec3 *b);
 
-#endif /* ROBOTICS_MATH_VEC3_H */
+#endif ROBOTICS_MATH_VEC3_H

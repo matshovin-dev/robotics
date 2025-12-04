@@ -1,7 +1,5 @@
 #include "stewart/kinematics.h"
-
 #include "robotics/math/vec3.h"
-
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,38 +10,51 @@ static const float DAMPENING = 0.999f; /* Demping */
 static const float TIMESTEP = 0.01f; /* 10ms timestep */
 
 /**
- * calculate_leg_forces - Beregn kraftvektorer fra benlengde-avvik
- * @geom: robot geometri
- * @result_inv: inverse kinematics resultat (motor vinkler, kne)
- * @result_forv: forward kinematics resultat (output)
+ * @function calculate_leg_forces
+ * @api STATIC
  *
- * Beregner kraftvektor for hvert ben basert på avvik mellom faktisk
+ * @input  geom->long_foot_length                           float (mm)
+ * @input  result_inv_in->knee_points[6]                    struct vec3 (mm)
+ * @input  result_inv_in->platform_points_transformed[6]    struct vec3 (mm)
+ *
+ * @output result_forv_out->leg_force_vectors[6]            struct vec3
+ * @output result_forv_out->leg_lengths[6]                  float (mm)
+ * @output result_forv_out->leg_length_errors[6]            float (mm)
+ *
+ * Beregner kraftvektorer for hvert ben basert på avvik mellom faktisk
  * og ønsket benlengde. Bruker fjær-modell: F = -k * Δx
+ *
+ * Algoritme:
+ * 1. Beregn benvektor fra knee til platform
+ * 2. Beregn deformert benlengde og avvik fra ønsket lengde
+ * 3. Beregn kraftvektor med fjærkonstant: F = -k * length_error * retning
  */
 static void
 calculate_leg_forces(const struct stewart_geometry *geom,
-		     const struct stewart_inverse_result *result_inv,
-		     struct stewart_forward_result *result_forv)
+		     const struct stewart_inverse_result *result_inv_in,
+		     struct stewart_forward_result *result_forv_out)
 {
 	struct vec3 leg_vector, leg_direction;
-	float actual_length, length_error;
+	float deform_length, length_error;
 	float force_magnitude;
-	int i;
 
-	for (i = 0; i < 6; i++) {
+	/*
+	 * 6 føtter
+	 */
+	for (int i = 0; i < 6; i++) {
 		/* Benvektor fra knee til platform */
-		vec3_sub(&result_inv->platform_points_transformed[i],
-			 &result_inv->knee_points[i], &leg_vector);
+		vec3_sub(&result_inv_in->platform_points_transformed[i],
+			 &result_inv_in->knee_points[i], &leg_vector);
 
-		/* Faktisk benlengde */
-		actual_length = vec3_length(&leg_vector);
+		/* Deformert benlengde */
+		deform_length = vec3_length(&leg_vector);
 
 		/* Avvik fra ønsket lengde */
-		length_error = actual_length - geom->long_foot_length;
+		length_error = deform_length - geom->long_foot_length;
 
 		/* Normaliser benvektor for retning */
 		leg_direction = leg_vector;
-		vec3_scale(&leg_direction, 1.0f / actual_length);
+		vec3_scale(&leg_direction, 1.0f / deform_length);
 
 		/*
 		 * Kraftvektor = fjærkraft * retning
@@ -52,39 +63,51 @@ calculate_leg_forces(const struct stewart_geometry *geom,
 		 */
 		force_magnitude = -SPRING_K * length_error;
 
-		result_forv->leg_force_vectors[i] = leg_direction;
-		vec3_scale(&result_forv->leg_force_vectors[i], force_magnitude);
+		result_forv_out->leg_force_vectors[i] = leg_direction;
+		vec3_scale(&result_forv_out->leg_force_vectors[i],
+			   force_magnitude);
 
 		/* Lagre lengder for debugging */
-		result_forv->leg_lengths[i] = actual_length;
-		result_forv->leg_length_errors[i] = length_error;
+		result_forv_out->leg_lengths[i] = deform_length;
+		result_forv_out->leg_length_errors[i] = length_error;
 	}
 }
 
 /**
- * calculate_total_force_and_moment - Summer krefter og momenter
- * @result_inv: inverse kinematics resultat
- * @result_forv: forward kinematics resultat
- * @total_force: output - total kraft
- * @total_moment: output - total moment
+ * @function calculate_total_force_and_moment
+ * @api STATIC
+ *
+ * @input  result_inv->platform_points_transformed[6]  struct vec3 (mm)
+ * @input  result_forv->leg_force_vectors[6]           struct vec3
+ *
+ * @output total_force                                 struct vec3
+ * @output total_moment                                struct vec3
  *
  * Summerer alle ben-kraftvektorer til total kraft.
  * Beregner moment som r × F (kryssprodukt) for hvert ben.
+ *
+ * Algoritme:
+ * 1. Nullstill total kraft og moment
+ * 2. For hvert ben:
+ *    - Summer kraftvektor til total
+ *    - Beregn moment = r × F (platform_point × force_vector)
+ *    - Summer til total moment
  */
-static void
-calculate_total_force_and_moment(const struct stewart_inverse_result *result_inv,
-				  const struct stewart_forward_result *result_forv,
-				  struct vec3 *total_force,
-				  struct vec3 *total_moment)
+static void calculate_total_force_and_moment(
+	const struct stewart_inverse_result *result_inv,
+	const struct stewart_forward_result *result_forv,
+	struct vec3 *total_force, struct vec3 *total_moment)
 {
 	struct vec3 moment_contribution;
-	int i;
 
 	/* Nullstill totaler */
 	*total_force = (struct vec3){ 0.0f, 0.0f, 0.0f };
 	*total_moment = (struct vec3){ 0.0f, 0.0f, 0.0f };
 
-	for (i = 0; i < 6; i++) {
+	/*
+	 * 6 føtter
+	 */
+	for (int i = 0; i < 6; i++) {
 		/* Summer kraftvektorer */
 		vec3_add(total_force, &result_forv->leg_force_vectors[i],
 			 total_force);
@@ -102,6 +125,9 @@ calculate_total_force_and_moment(const struct stewart_inverse_result *result_inv
 	}
 }
 
+/*
+ * entry point
+ */
 void stewart_kinematics_forward(const struct stewart_geometry *geom,
 				struct stewart_pose *pose_calc,
 				const struct stewart_inverse_result *result_inv,
@@ -149,6 +175,9 @@ void stewart_kinematics_forward(const struct stewart_geometry *geom,
 	result_forv->pose_result = *pose_calc;
 }
 
+/*
+ * printings
+ */
 void stewart_forward_result_print(const struct stewart_forward_result *result)
 {
 	int i;
@@ -168,7 +197,9 @@ void stewart_forward_result_print(const struct stewart_forward_result *result)
 	}
 
 	printf("\n  Calculated position: (%.2f, %.2f, %.2f) mm\n",
-	       result->pose_result.tx, result->pose_result.ty, result->pose_result.tz);
+	       result->pose_result.tx, result->pose_result.ty,
+	       result->pose_result.tz);
 	printf("  Calculated rotation: (%.2f, %.2f, %.2f)°\n",
-	       result->pose_result.rx, result->pose_result.ry, result->pose_result.rz);
+	       result->pose_result.rx, result->pose_result.ry,
+	       result->pose_result.rz);
 }

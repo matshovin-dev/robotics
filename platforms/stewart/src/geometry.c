@@ -1,5 +1,4 @@
 #include "stewart/geometry.h"
-
 #include <assert.h>
 #include <stdio.h>
 
@@ -26,8 +25,9 @@ void stewart_geometry_print(const struct stewart_geometry *geom)
 	printf("\n  Platform points (home position):\n");
 	for (int i = 0; i < 6; i++) {
 		printf("    [%d]: (%.2f, %.2f, %.2f)\n", i,
-		       geom->platform_points[i].x, geom->platform_points[i].y,
-		       geom->platform_points[i].z);
+		       geom->platform_home_points[i].x,
+		       geom->platform_home_points[i].y,
+		       geom->platform_home_points[i].z);
 	}
 }
 
@@ -53,7 +53,7 @@ const struct stewart_geometry ROBOT_MX64 = {
 	 * Målt fra SolidWorks og rotert 120°/240° CCW (sett nedenfra)
 	 * y-koordinat er home_height (205mm)
 	 */
-	.platform_points = {
+	.platform_home_points = {
 		{74.91f, 205.0f, 69.65f},   /* 0 - målt fra SolidWorks */
 		{97.77f, 205.0f, 30.05f},   /* 1 - point[5] rotert 120° CCW */
 		{22.86f, 205.0f, -99.70f},  /* 2 - point[0] rotert 120° CCW */
@@ -102,12 +102,12 @@ const struct stewart_geometry ROBOT_MX64 = {
  * Koordinatsystem samme som MX64 versjon.
  */
 const struct stewart_geometry ROBOT_AX18 = {
-	.platform_points = { { 5.50f, 140.0f, 74.72f },
-			     { 67.46f, 140.0f, -32.60f },
-			     { 61.96f, 140.0f, -42.12f },
-			     { -61.96f, 140.0f, -42.12f },
-			     { -67.46f, 140.0f, -32.60f },
-			     { -5.50f, 140.0f, 74.72f } },
+	.platform_home_points = { { 5.50f, 140.0f, 74.72f },
+				  { 67.46f, 140.0f, -32.60f },
+				  { 61.96f, 140.0f, -42.12f },
+				  { -61.96f, 140.0f, -42.12f },
+				  { -67.46f, 140.0f, -32.60f },
+				  { -5.50f, 140.0f, 74.72f } },
 
 	.base_points = { { 33.29f, 0.0f, 74.87f },
 			 { 81.48f, 0.00f, -8.61f },

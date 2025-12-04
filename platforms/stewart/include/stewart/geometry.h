@@ -5,37 +5,40 @@
 
 /**
  * struct stewart_geometry - Stewart platform fysisk geometri
- * @base_points: base attachment points (6) i mm, relativt til base center
- * @platform_points: platform attachment points (6) i mm ved home-posisjon,
- *                   (y = home_height)
- * @home_height: avstand fra base plan til platform plan i neutral posisjon (mm)
- * @short_foot_length: kort ben lengde (mm) - motor arm
- * @long_foot_length: langt ben lengde (mm) - pushrod
- * @motor_arm_outward: 1 = motor arm peker utover (MX64), 0 = innover (AX18)
- * @max_motor_angle_024_deg: hard limit max vinkel for motor 0,2,4 (grader)
- * @min_motor_angle_024_deg: hard limit min vinkel for motor 0,2,4 (grader)
- * @max_motor_angle_135_deg: hard limit max vinkel for motor 1,3,5 (grader)
- * @min_motor_angle_135_deg: hard limit min vinkel for motor 1,3,5 (grader)
- * @motor_clamp_limit_angle_deg: soft dampening grense (grader)
- * @max_pose_rotation_amplitude: maksimal rotasjon amplitude (grader)
- * @max_pose_rotation_bias: maksimal rotasjon bias/offset (grader)
- * @max_pose_translation_amplitude: maksimal translasjon amplitude (mm)
- * @max_pose_translation_bias: maksimal translasjon bias/offset (mm)
+ *
+ * @base_points[6] vec3 (mm) - Base attachment points (y=0)
+ * @platform_home_points[6] vec3 (mm) - Platform points at home
+ * @home_height float (mm) - Avstand base til platform
+ * @short_foot_length float (mm) - Motor arm lengde
+ * @long_foot_length float (mm) - Pushrod lengde
+ * @motor_arm_outward int - 1=utover (MX64), 0=innover (AX18)
+ * @max_motor_angle_024_deg float (deg) - Max vinkel motor 0,2,4
+ * @min_motor_angle_024_deg float (deg) - Min vinkel motor 0,2,4
+ * @max_motor_angle_135_deg float (deg) - Max vinkel motor 1,3,5
+ * @min_motor_angle_135_deg float (deg) - Min vinkel motor 1,3,5
+ * @motor_clamp_limit_angle_deg float (deg) - Soft dampening grense
+ * @max_pose_rotation_amplitude float - Max rotasjon amplitude
+ * @max_pose_rotation_bias float - Max rotasjon bias/offset
+ * @max_pose_translation_amplitude float (mm) - Max translasjon amplitude
+ * @max_pose_translation_bias float (mm) - Max translasjon bias
  *
  * Inneholder alle fysiske dimensjoner og kinematiske grenser for en
  * spesifikk Stewart platform konfigurasjon. Robot-spesifikk men
  * motor-agnostisk (fungerer med alle aktuator-typer).
  *
- * Origo ligger i platform base i høyde med de 8 motorakslene (base_point).
+ * Origo ligger i platform base ved 6 motoraksler.
  *
  * Motor layout (sett ovenfra, CCW nummerering):
  *    3     2
  *   4       1
  *      5 0
+ *
+ * @invariant max_motor_angle > min_motor_angle for begge grupper
+ * @note platform_home_points kopieres ved bruk (const i struct)
  */
 struct stewart_geometry {
-	struct vec3 base_points[6]; /* Ligger i y = 0 */
-	struct vec3 platform_points[6]; /* Ligger i y = home_hight */
+	struct vec3 base_points[6];
+	struct vec3 platform_home_points[6];
 
 	float home_height;
 	float short_foot_length;
@@ -56,10 +59,25 @@ struct stewart_geometry {
 };
 
 /**
- * stewart_geometry_print - Print geometri til stdout
- * @geom: geometri struktur
+ * @function stewart_geometry_print
+ * @api PUBLIC
  *
- * Printer alle geometri-parametere for debugging.
+ * @input  geom->base_points[6]                    struct vec3 (mm)
+ * @input  geom->platform_home_points[6]           struct vec3 (mm)
+ * @input  geom->home_height                       float (mm)
+ * @input  geom->short_foot_length                 float (mm)
+ * @input  geom->long_foot_length                  float (mm)
+ * @input  geom->motor_arm_outward                 int
+ * @input  geom->max/min_motor_angle_024/135_deg   float (degrees)
+ * @input  geom->motor_clamp_limit_angle_deg       float (degrees)
+ * @input  geom->max_pose_rotation_amplitude       float
+ * @input  geom->max_pose_rotation_bias            float
+ * @input  geom->max_pose_translation_amplitude    float (mm)
+ * @input  geom->max_pose_translation_bias         float (mm)
+ *
+ * @output stdout  Formatted text output
+ *
+ * Printer alle geometri-parametere til stdout for debugging.
  */
 void stewart_geometry_print(const struct stewart_geometry *geom);
 

@@ -7,13 +7,16 @@
 
 /**
  * struct stewart_inverse_result - Inverse kinematics resultat
- * @motor_angles_deg: 	Motor vinkler (6)
- * @knee_points:	Kne-posisjoner (6)
- * @platform_points_transformed: Transformerte platform punkter (6)
- * @error: 		0 = success, 1 = NaN detected
  *
- * Inneholder motor-vinkler og mellomresultater fra inverse kinematics.
- * Beregnes fra ønsket pose til motor-vinkler.
+ * @motor_angles_deg[6] float (deg) - Motor vinkler
+ * @knee_points[6] vec3 (mm) - Kne posisjoner
+ * @platform_points_transformed[6] vec3 (mm) - Transformerte punkter
+ * @error int - 0=success, 1=NaN detected
+ *
+ * Inneholder alle beregnede verdier fra inverse kinematics.
+ * Beregnes fra ønsket platform pose.
+ *
+ * @note Alle arrays indeksert 0-5 for motor nummer
  */
 struct stewart_inverse_result {
 	float motor_angles_deg[6];
@@ -24,16 +27,20 @@ struct stewart_inverse_result {
 
 /**
  * struct stewart_forward_result - Forward kinematics resultat
- * @leg_force_vectors:	Kraftvektorer for hvert ben (6)
- * @total_force:	Total kraft på platform
- * @total_moment:	Total moment på platform
- * @leg_lengths:	Faktiske benlengder i mm (6)
- * @leg_length_errors:	Avvik fra ønsket lengde i mm (6)
- * @pose_result:	Beregnet pose (rx, ry, rz, tx, ty, tz)
+ *
+ * @leg_force_vectors[6] vec3 - Kraftvektorer for hvert ben
+ * @total_force vec3 - Total kraft på platform
+ * @total_moment vec3 - Total moment på platform
+ * @leg_lengths[6] float (mm) - Deformerte benlengder
+ * @leg_length_errors[6] float (mm) - Avvik fra ønsket lengde
+ * @pose_result stewart_pose - Beregnet pose
  *
  * pose_result er output fra forward kinematics beregning.
- * Alt annet er interne krefter, momenter og debug-info.
- * Brukes for å verifisere IK-beregning og beregne belastning.
+ * Øvrige felt er interne krefter, momenter og debug-info.
+ * Beregnes fra knepunkt og platform_points_transformed.
+ * Brukes for å verifisere IK og beregne belastning.
+ *
+ * @note Arrays indeksert 0-5 for motor nummer
  */
 struct stewart_forward_result {
 	struct vec3 leg_force_vectors[6];
@@ -47,56 +54,86 @@ struct stewart_forward_result {
 };
 
 /**
- * stewart_kinematics_inverse
- * @param[in] 	geom 	robot geometri
- * @param[in] 	pose_in gitt platform pose, rx ry yz tx ty tz
- * @param[out] 	result 	motor vinkler, kne posisjoner, transformerte punkter
- * @param[in]  	debug	1 = print debug info, 0 = stille
+ * @function stewart_kinematics_inverse
+ * @api PUBLIC
  *
- * Beregner motor-vinkler fra ønsket platform pose.
+ * @input  geom->base_points[6]                      struct vec3 (mm)
+ * @input  geom->platform_home_points[6]             struct vec3 (mm)
+ * @input  geom->short_foot_length                   float (mm)
+ * @input  geom->long_foot_length                    float (mm)
+ * @input  geom->motor_arm_outward                   int
+ * @input  geom->max/min_motor_angle_024/135_deg     float (degrees)
+ * @input  geom->motor_clamp_limit_angle_deg         float (degrees)
+ * @input  pose_in->{rx,ry,rz}                       float (degrees)
+ * @input  pose_in->{tx,ty,tz}                       float (mm)
+ * @input  debug                                     int (1=print, 0=silent)
+ *
+ * @output result_out->motor_angles_deg[6]           float (degrees)
+ * @output result_out->knee_points[6]                struct vec3 (mm)
+ * @output result_out->platform_points_transformed[6] struct vec3 (mm)
+ * @output result_out->error                         int (0=success, 1=NaN)
+ *
+ * Beregner motor-vinkler, knepunkt og nye topp platform punkt
+ * fra ønsket platform pose.
  *
  * Algoritme:
- * 1. Transformer platform_flat punkter fra *geom opp med
- * pose_in (roter + translater + hever med stewart_geometry.home_height)
+ * 1. Roterer og translaterer geom.platform_home_points med pose_in, til
+ *    result_out->platform_points_transformed
  * 2. For hver motor:
- *    - Projiser platform punkt på motor plan
+ *    - Projiser platform_points_transformed på motor plan
  *    - Beregn trekant geometri (pythagoras + cosinus-setningen)
  *    - Finn motor vinkel
  *    - Beregn kne posisjon
- *
- * Motor vinkler blir hard eller soft clamped til geometri-grenser.
+ * 3. Motor vinkler blir hard eller soft clamped til geometri-grenser.
  */
 void stewart_kinematics_inverse(const struct stewart_geometry *geom,
 				const struct stewart_pose *pose_in,
-				struct stewart_inverse_result *result,
+				struct stewart_inverse_result *result_out,
 				int debug);
 
 /**
- * calculate_transformed_platform_points - Transform platform punkter med pose
- * @param[in]  geom     robot geometri
- * @param[in]  pose_in  gitt pose (rx, ry, rz, tx, ty, tz)
- * @param[out] result   transformerte platform punkter
+ * @function calculate_transformed_platform_points
+ * @api PUBLIC
  *
- * Roterer platform_points med ZYX Euler angles og translerer med pose_in.
- * platform_points defineres ved home-posisjon og konverteres til lokalt
- * koordinatsystem før rotasjon. pose_in inneholder absolutt posisjon.
+ * @input  geom->platform_home_points[6]             struct vec3 (mm)
+ * @input  pose_in->{rx,ry,rz}                       float (degrees)
+ * @input  pose_in->{tx,ty,tz}                       float (mm)
+ *
+ * @output result_out->platform_points_transformed[6] struct vec3 (mm)
+ *
+ * Transformer platform_home_points med pose.
  * Første steg i inverse kinematics.
- * Kan også brukes av forward kinematics for å oppdatere transformerte punkter.
+ * Kan også brukes av forward_kinematics for å finne transformerte punkter.
  */
 void calculate_transformed_platform_points(
 	const struct stewart_geometry *geom, const struct stewart_pose *pose_in,
-	struct stewart_inverse_result *result);
+	struct stewart_inverse_result *result_out);
 
 /**
- * @brief Forward kinematics med iterativ fjær-modell
+ * @function stewart_kinematics_forward
+ * @api PUBLIC
  *
- * @param[in]     geom        Robot geometri
- * @param[in,out] pose_calc   Pose (modifiseres iterativt)
- * @param[in]     result_inv  Motor vinkler og kne-posisjon
- * @param[out]    result_forv Krefter, momenter, beregnet pose
+ * @input  geom->base_points[6]                      struct vec3 (mm)
+ * @input  geom->short_foot_length                   float (mm)
+ * @input  geom->long_foot_length                    float (mm)
+ * @input  result_inv->knee_points[6]                struct vec3 (mm)
+ * @input  result_inv->platform_points_transformed[6] struct vec3 (mm)
+ * @input  pose_calc->{rx,ry,rz,tx,ty,tz}            float (degrees/mm) -
+ * MODIFIED
+ *
+ * @output pose_calc->{rx,ry,rz,tx,ty,tz}            float (degrees/mm) -
+ * updated iteratively
+ * @output result_forv->leg_force_vectors[6]         struct vec3
+ * @output result_forv->total_force                  struct vec3
+ * @output result_forv->total_moment                 struct vec3
+ * @output result_forv->leg_lengths[6]               float (mm)
+ * @output result_forv->leg_length_errors[6]         float (mm)
+ * @output result_forv->pose_result                  struct stewart_pose
  *
  * Beregner krefter/momenter fra motor-vinkler. Oppdaterer pose basert
  * på fjær-modell. Kalles etter stewart_kinematics_inverse().
+ *
+ * @note pose_calc er både input og output (modifiseres iterativt)
  */
 void stewart_kinematics_forward(const struct stewart_geometry *geom,
 				struct stewart_pose *pose_calc,
@@ -104,19 +141,37 @@ void stewart_kinematics_forward(const struct stewart_geometry *geom,
 				struct stewart_forward_result *result_forv);
 
 /**
- * stewart_inverse_result_print - Print inverse kinematics resultat
- * @result: resultat struktur
+ * @function stewart_inverse_result_print
+ * @api PUBLIC
  *
- * Printer motor vinkler, kne posisjoner og transformerte punkter.
+ * @input  result_in->motor_angles_deg[6]            float (degrees)
+ * @input  result_in->knee_points[6]                 struct vec3 (mm)
+ * @input  result_in->platform_points_transformed[6] struct vec3 (mm)
+ * @input  result_in->error                          int
+ *
+ * @output stdout  Formatted text output
+ *
+ * Printer motor vinkler, kne posisjoner og transformerte punkter til stdout.
  */
-void stewart_inverse_result_print(const struct stewart_inverse_result *result);
+void stewart_inverse_result_print(
+	const struct stewart_inverse_result *result_in);
 
 /**
- * stewart_forward_result_print - Print forward kinematics resultat
- * @result: resultat struktur
+ * @function stewart_forward_result_print
+ * @api PUBLIC
  *
- * Printer krefter, momenter, benlengder og beregnet pose.
+ * @input  result_in->leg_force_vectors[6]  struct vec3
+ * @input  result_in->total_force           struct vec3
+ * @input  result_in->total_moment          struct vec3
+ * @input  result_in->leg_lengths[6]        float (mm)
+ * @input  result_in->leg_length_errors[6]  float (mm)
+ * @input  result_in->pose_result           struct stewart_pose
+ *
+ * @output stdout  Formatted text output
+ *
+ * Printer krefter, momenter, benlengder og beregnet pose til stdout.
  */
-void stewart_forward_result_print(const struct stewart_forward_result *result);
+void stewart_forward_result_print(
+	const struct stewart_forward_result *result_in);
 
 #endif /* STEWART_KINEMATICS_H */

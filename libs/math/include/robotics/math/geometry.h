@@ -4,26 +4,32 @@
 #include "robotics/math/vec3.h"
 
 /**
- * distance_point_to_plane - Beregn avstand fra punkt til plan
- * @point: punktet som skal måles fra
- * @plane_point: et punkt på planet
- * @plane_normal: normalvektor til planet (bør være normalisert)
+ * @function distance_point_to_plane
+ * @api PUBLIC
  *
- * Beregner signed distance. Positiv avstand betyr at punktet er på
- * siden som normalvektoren peker mot.
+ * @input  point->{x,y,z}        float
+ * @input  plane_point->{x,y,z}  float
+ * @input  plane_normal->{x,y,z} float (should be normalized)
+ * @output return                float (signed distance)
  *
- * Retur: avstand fra punkt til plan
+ * Beregner signed distance fra punkt til plan.
+ * Positiv avstand: punktet er på siden normalvektoren peker mot.
+ * Negativ avstand: punktet er på motsatt side.
  */
 float distance_point_to_plane(const struct vec3 *point,
 			      const struct vec3 *plane_point,
 			      const struct vec3 *plane_normal);
 
 /**
- * project_point_to_plane - Projiser punkt ned på plan
- * @point: punktet som skal projiseres
- * @plane_point: et punkt på planet
- * @plane_normal: normalvektor til planet (bør være normalisert)
- * @result: projisert punkt på planet
+ * @function project_point_to_plane
+ * @api PUBLIC
+ *
+ * @input  point->{x,y,z}        float
+ * @input  plane_point->{x,y,z}  float
+ * @input  plane_normal->{x,y,z} float (should be normalized)
+ * @output result->{x,y,z}       float (projected point on plane)
+ *
+ * Projiserer punkt ned på plan langs normalvektor.
  */
 void project_point_to_plane(const struct vec3 *point,
 			    const struct vec3 *plane_point,
