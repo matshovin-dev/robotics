@@ -152,4 +152,4 @@ float vec3_distance(const struct vec3 *a, const struct vec3 *b);
  */
 float vec3_distance_squared(const struct vec3 *a, const struct vec3 *b);
 
-#endif ROBOTICS_MATH_VEC3_H
+#endif /* ROBOTICS_MATH_VEC3_H */

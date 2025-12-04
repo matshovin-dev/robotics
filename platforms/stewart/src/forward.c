@@ -13,13 +13,13 @@ static const float TIMESTEP = 0.01f; /* 10ms timestep */
  * @function calculate_leg_forces
  * @api STATIC
  *
- * @input  geom->long_foot_length                           float (mm)
- * @input  result_inv_in->knee_points[6]                    struct vec3 (mm)
- * @input  result_inv_in->platform_points_transformed[6]    struct vec3 (mm)
+ * @input  geom->long_foot_length                      float (mm)
+ * @input  result_inv_in->knee_points[6]               struct vec3 (mm)
+ * @input  result_forv->platform_points_iter[6]        struct vec3 (mm)
  *
- * @output result_forv_out->leg_force_vectors[6]            struct vec3
- * @output result_forv_out->leg_lengths[6]                  float (mm)
- * @output result_forv_out->leg_length_errors[6]            float (mm)
+ * @output result_forv->leg_force_vectors[6]           struct vec3
+ * @output result_forv->leg_lengths[6]                 float (mm)
+ * @output result_forv->leg_length_errors[6]           float (mm)
  *
  * Beregner kraftvektorer for hvert ben basert på avvik mellom faktisk
  * og ønsket benlengde. Bruker fjær-modell: F = -k * Δx
@@ -32,7 +32,7 @@ static const float TIMESTEP = 0.01f; /* 10ms timestep */
 static void
 calculate_leg_forces(const struct stewart_geometry *geom,
 		     const struct stewart_inverse_result *result_inv_in,
-		     struct stewart_forward_result *result_forv_out)
+		     struct stewart_forward_result *result_forv)
 {
 	struct vec3 leg_vector, leg_direction;
 	float deform_length, length_error;
@@ -43,7 +43,7 @@ calculate_leg_forces(const struct stewart_geometry *geom,
 	 */
 	for (int i = 0; i < 6; i++) {
 		/* Benvektor fra knee til platform */
-		vec3_sub(&result_inv_in->platform_points_transformed[i],
+		vec3_sub(&result_forv->platform_points_iter[i],
 			 &result_inv_in->knee_points[i], &leg_vector);
 
 		/* Deformert benlengde */
@@ -63,13 +63,12 @@ calculate_leg_forces(const struct stewart_geometry *geom,
 		 */
 		force_magnitude = -SPRING_K * length_error;
 
-		result_forv_out->leg_force_vectors[i] = leg_direction;
-		vec3_scale(&result_forv_out->leg_force_vectors[i],
-			   force_magnitude);
+		result_forv->leg_force_vectors[i] = leg_direction;
+		vec3_scale(&result_forv->leg_force_vectors[i], force_magnitude);
 
 		/* Lagre lengder for debugging */
-		result_forv_out->leg_lengths[i] = deform_length;
-		result_forv_out->leg_length_errors[i] = length_error;
+		result_forv->leg_lengths[i] = deform_length;
+		result_forv->leg_length_errors[i] = length_error;
 	}
 }
 
@@ -77,11 +76,11 @@ calculate_leg_forces(const struct stewart_geometry *geom,
  * @function calculate_total_force_and_moment
  * @api STATIC
  *
- * @input  result_inv->platform_points_transformed[6]  struct vec3 (mm)
- * @input  result_forv->leg_force_vectors[6]           struct vec3
+ * @input  result_forv->platform_points_iter[6]  struct vec3 (mm)
+ * @input  result_forv->leg_force_vectors[6]     struct vec3
  *
- * @output total_force                                 struct vec3
- * @output total_moment                                struct vec3
+ * @output total_force                           struct vec3
+ * @output total_moment                          struct vec3
  *
  * Summerer alle ben-kraftvektorer til total kraft.
  * Beregner moment som r × F (kryssprodukt) for hvert ben.
@@ -94,7 +93,6 @@ calculate_leg_forces(const struct stewart_geometry *geom,
  *    - Summer til total moment
  */
 static void calculate_total_force_and_moment(
-	const struct stewart_inverse_result *result_inv,
 	const struct stewart_forward_result *result_forv,
 	struct vec3 *total_force, struct vec3 *total_moment)
 {
@@ -114,10 +112,10 @@ static void calculate_total_force_and_moment(
 
 		/*
 		 * Beregn moment = r × F
-		 * r = platform_points_transformed (hvor kraft angriper)
+		 * r = platform_points_iter (hvor kraft angriper)
 		 * F = leg_force_vectors
 		 */
-		vec3_cross(&result_inv->platform_points_transformed[i],
+		vec3_cross(&result_forv->platform_points_iter[i],
 			   &result_forv->leg_force_vectors[i],
 			   &moment_contribution);
 
@@ -129,50 +127,74 @@ static void calculate_total_force_and_moment(
  * entry point
  */
 void stewart_kinematics_forward(const struct stewart_geometry *geom,
-				struct stewart_pose *pose_calc,
 				const struct stewart_inverse_result *result_inv,
 				struct stewart_forward_result *result_forv)
 {
-	struct vec3 total_force, total_moment;
 
 	assert(geom != NULL);
-	assert(pose_calc != NULL);
 	assert(result_inv != NULL);
 	assert(result_forv != NULL);
 
-	/* Beregn kraftvektorer fra benlengde-avvik */
-	calculate_leg_forces(geom, result_inv, result_forv);
+	struct vec3 total_force, total_moment;
 
-	/* Summer til total kraft og moment */
-	calculate_total_force_and_moment(result_inv, result_forv, &total_force,
-					 &total_moment);
+	/* Initialiser iterative platform punkter fra input */
+	for (int i = 0; i < 6; i++) {
+		result_forv->platform_points_iter[i] =
+			result_inv->platform_points_transformed[i];
+	}
 
-	/*
-	 * Integrer krefter til ny pose
-	 * F = ma (antar m=1), M = Iα (antar I=1)
-	 */
-	pose_calc->tx += total_force.x * TIMESTEP;
-	pose_calc->ty += total_force.y * TIMESTEP;
-	pose_calc->tz += total_force.z * TIMESTEP;
+	int number_of_iterations = 20;
+	for (int i = 0; i < number_of_iterations; i++) {
+		/*
+		 * Beregn kraftvektorer fra benlengde-avvik.
+		 * Her må:
+		 *   result_forv.platform_points_iter
+		 * være oppdatert som resultat av forrige iterasjon
+		 */
+		calculate_leg_forces(geom, result_inv, result_forv);
 
-	pose_calc->rx += total_moment.x * TIMESTEP;
-	pose_calc->ry += total_moment.y * TIMESTEP;
-	pose_calc->rz += total_moment.z * TIMESTEP;
+		/*
+		 * Summer til total kraft og moment.
+		 * Her må også:
+		 *   result_forv.platform_points_iter
+		 * være oppdatert som resultat av forrige iterasjon
+		 * da disse brukes for å beregne moment
+		 */
+		calculate_total_force_and_moment(result_forv, &total_force,
+						 &total_moment);
 
-	/* Dempning for å unngå oscillering */
-	pose_calc->tx *= DAMPENING;
-	pose_calc->ty *= DAMPENING;
-	pose_calc->tz *= DAMPENING;
+		/*
+		 * Integrer krefter til ny pose
+		 * F = ma (antar m=1), M = Iα (antar I=1)
+		 *
+		 * pose_calc må være oppdatert fra forrige iterasjon
+		 */
+		result_forv->pose_result.tx += total_force.x * TIMESTEP;
+		result_forv->pose_result.ty += total_force.y * TIMESTEP;
+		result_forv->pose_result.tz += total_force.z * TIMESTEP;
 
-	pose_calc->rx *= DAMPENING;
-	pose_calc->ry *= DAMPENING;
-	pose_calc->rz *= DAMPENING;
+		result_forv->pose_result.rx += total_moment.x * TIMESTEP;
+		result_forv->pose_result.ry += total_moment.y * TIMESTEP;
+		result_forv->pose_result.rz += total_moment.z * TIMESTEP;
 
-	/* Lagre resultater */
-	result_forv->total_force = total_force;
-	result_forv->total_moment = total_moment;
+		/* Dempning for å unngå oscillering */
+		result_forv->pose_result.tx *= DAMPENING;
+		result_forv->pose_result.ty *= DAMPENING;
+		result_forv->pose_result.tz *= DAMPENING;
 
-	result_forv->pose_result = *pose_calc;
+		result_forv->pose_result.rx *= DAMPENING;
+		result_forv->pose_result.ry *= DAMPENING;
+		result_forv->pose_result.rz *= DAMPENING;
+
+		/* Lagre resultater */
+		result_forv->total_force = total_force;
+		result_forv->total_moment = total_moment;
+
+		/* Finner nye platform punkt fra pose */
+		calculate_transformed_platform_points(
+			geom, &result_forv->pose_result,
+			result_forv->platform_points_iter);
+	}
 }
 
 /*
