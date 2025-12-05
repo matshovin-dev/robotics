@@ -34,7 +34,7 @@ static int has_error2 = 0;
 static float camera_azimuth = 45.0f; /* Horizontal rotation (degrees) */
 static float camera_elevation = 30.0f; /* Vertical tilt (degrees) */
 static float camera_distance = 600.0f; /* Distance from target */
-static float ortho_scale = 400.0f; /* Orthographic view scale */
+static float ortho_scale = 200.0f; /* Orthographic view scale */
 
 /**
  * draw_sphere - Tegn en sfære på gitt posisjon
@@ -121,14 +121,12 @@ static void render_pose(const struct stewart_inverse_result *result, float r,
 {
 	int i;
 
-	(void)label; /* Unused for now */
-
 	/* Tegn platform sekskant */
 	glColor3f(r * 0.8f, g * 0.8f, b * 0.8f);
-	glLineWidth(3.0f);
+	glLineWidth(6.0f);
 	glBegin(GL_LINE_LOOP);
 	for (i = 0; i < 6; i++) {
-		struct vec3 *p = &result->platform_points_transformed[i];
+		const struct vec3 *p = &result->platform_points_transformed[i];
 		glVertex3f(p->x, p->y, p->z);
 	}
 	glEnd();
@@ -139,7 +137,7 @@ static void render_pose(const struct stewart_inverse_result *result, float r,
 	glBegin(GL_LINES);
 	for (i = 0; i < 6; i++) {
 		struct vec3 *base = &geometry.base_points[i];
-		struct vec3 *knee = &result->knee_points[i];
+		const struct vec3 *knee = &result->knee_points[i];
 		glVertex3f(base->x, base->y, base->z);
 		glVertex3f(knee->x, knee->y, knee->z);
 	}
@@ -150,8 +148,9 @@ static void render_pose(const struct stewart_inverse_result *result, float r,
 	glLineWidth(2.0f);
 	glBegin(GL_LINES);
 	for (i = 0; i < 6; i++) {
-		struct vec3 *knee = &result->knee_points[i];
-		struct vec3 *platform = &result->platform_points_transformed[i];
+		const struct vec3 *knee = &result->knee_points[i];
+		const struct vec3 *platform =
+			&result->platform_points_transformed[i];
 		glVertex3f(knee->x, knee->y, knee->z);
 		glVertex3f(platform->x, platform->y, platform->z);
 	}
@@ -160,7 +159,7 @@ static void render_pose(const struct stewart_inverse_result *result, float r,
 	/* Tegn knee points (kuler) */
 	glColor3f(r, g, b);
 	for (i = 0; i < 6; i++) {
-		struct vec3 *knee = &result->knee_points[i];
+		const struct vec3 *knee = &result->knee_points[i];
 		draw_sphere(knee->x, knee->y, knee->z, 5.0f, 12, 12);
 	}
 }
@@ -200,7 +199,7 @@ static void render_comparison(void)
 
 	/* Tegn base sekskant (grå - deles av begge poser) */
 	glColor3f(0.4f, 0.4f, 0.4f);
-	glLineWidth(3.0f);
+	glLineWidth(6.0f);
 	glBegin(GL_LINE_LOOP);
 	for (i = 0; i < 6; i++) {
 		struct vec3 *p = &geometry.base_points[i];
@@ -241,7 +240,7 @@ static void compute_kinematics_for_pose(const struct viz_pose_packet *packet,
 {
 	struct stewart_pose pose;
 
-	stewart_pose_init(&pose, &geometry);
+	/* Konverter UDP packet til stewart pose (absolutte koordinater) */
 	pose.rx = packet->rx;
 	pose.ry = packet->ry;
 	pose.rz = packet->rz;
@@ -266,9 +265,10 @@ static void compute_kinematics_for_pose(const struct viz_pose_packet *packet,
 	}
 
 	if (changed) {
-		printf("Pose %d Motors: ", pose_num);
+		// printf("Pose %d Motors: ", pose_num);
 		for (int i = 0; i < 6; i++) {
-			printf("[%d]=%.1f° ", i, result->motor_angles_deg[i]);
+			;  // printf("[%d]=%.1f° ", i,
+			   // result->motor_angles_deg[i]);
 		}
 		if (*has_error)
 			printf(" ⚠️  ERROR!");
@@ -365,7 +365,7 @@ int main(void)
 	}
 
 	/* Lag vindu */
-	window = glfwCreateWindow(1024, 768, "Stewart Compare", NULL, NULL);
+	window = glfwCreateWindow(500, 400, "Stewart Compare", NULL, NULL);
 	if (!window) {
 		fprintf(stderr, "Failed to create window\n");
 		glfwTerminate();

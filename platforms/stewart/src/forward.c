@@ -5,7 +5,7 @@
 #include <string.h>
 
 /* Simulerings-parametere for fjær-modell */
-static const float SPRING_K = 0.6f; /* Fjærkonstant */
+static const float SPRING_K = 0.2f; /* Fjærkonstant */
 static const float DAMPENING = 0.999f; /* Demping */
 static const float TIMESTEP = 0.01f; /* 10ms timestep */
 
@@ -137,11 +137,16 @@ void stewart_kinematics_forward(const struct stewart_geometry *geom,
 
 	struct vec3 total_force, total_moment;
 
-	/* Initialiser iterative platform punkter fra input */
-	for (int i = 0; i < 6; i++) {
-		result_forv->platform_points_iter[i] =
-			result_inv->platform_points_transformed[i];
-	}
+	/*
+	 * Initialiser iterative platform punkter fra posen (IKKE fra
+	 * result_inv->platform_points_transformed).
+	 * Dette er kritisk når motor-vinkler er clamped, da
+	 * platform_points_transformed fra inverse ikke lenger stemmer med
+	 * knee_points.
+	 */
+	calculate_transformed_platform_points(
+		geom, &result_forv->pose_result,
+		result_forv->platform_points_iter);
 
 	int number_of_iterations = 20;
 	for (int i = 0; i < number_of_iterations; i++) {

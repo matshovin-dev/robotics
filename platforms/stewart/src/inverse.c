@@ -297,8 +297,16 @@ void stewart_kinematics_inverse(const struct stewart_geometry *geom,
 	for (i = 0; i < 6; i++)
 		calculate_motor_angle(i, geom, result_inv, debug);
 
-	/* Beregn kne posisjoner */
+	/* Beregn kne posisjoner fra (potensielt clampede) motor-vinkler */
 	calculate_knee_positions(geom, result_inv);
+
+	/*
+	 * VIKTIG: Etter clamping stemmer ikke lenger
+	 * platform_points_transformed med de faktiske knee_points.
+	 * Forward kinematics MÅ derfor generere sine egne
+	 * platform_points_transformed fra den iterative posen for å unngå
+	 * store fjærkrefter og ustabilitet.
+	 */
 }
 
 /*

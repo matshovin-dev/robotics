@@ -247,8 +247,7 @@ static void compute_kinematics(void)
 {
 	struct stewart_pose pose;
 
-	/* Konverter UDP packet til stewart pose */
-	stewart_pose_init(&pose, &geometry);
+	/* Konverter UDP packet til stewart pose (absolutte koordinater) */
 	pose.rx = current_pose.rx;
 	pose.ry = current_pose.ry;
 	pose.rz = current_pose.rz;

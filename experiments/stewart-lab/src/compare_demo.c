@@ -1,118 +1,50 @@
 #include "stewart/geometry.h"
 #include "stewart/kinematics.h"
 #include "stewart/pose.h"
-#include "viz_protocol.h"
-
-#include <arpa/inet.h>
+#include "viz_sender.h"
 #include <math.h>
-#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
 #include <unistd.h>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
 #endif
 
+/*
+ * Sender 2 poser over 2 UDP porter
+ */
+
 static struct stewart_geometry geometry;
 static struct stewart_inverse_result inverse_result;
 static struct stewart_forward_result forward_result;
-struct stewart_pose pose_reference = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
-struct stewart_pose pose_calculated = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+struct stewart_pose pose_reference = { 0.0f, 0.0f, 0.0f, 0.0f, 210.0f, 0.0f };
+struct stewart_pose pose_calculated = { 0.0f, 0.0f, 0.0f, 0.0f, 210.0f, 0.0f };
 
-/**
- * udp_create_sender - Lag UDP socket for sending
- */
-static int udp_create_sender(void)
+static void generate_reference_motion(float time,
+				      const struct stewart_geometry *geometry,
+				      struct stewart_pose *ref_pose,
+				      struct stewart_inverse_result *result_inv)
 {
-	int sock;
-
-	sock = socket(AF_INET, SOCK_DGRAM, 0);
-	if (sock < 0) {
-		perror("socket");
-		return -1;
-	}
-
-	return sock;
-}
-
-/**
- * send_pose_to_port - Send pose via UDP til spesifikk port
- * @sock: UDP socket
- * @pose: stewart_pose struktur
- * @robot_type: robot konfigurasjon type
- * @port: destinasjons port
- *
- * Konverterer stewart_pose til viz_pose_packet og sender via UDP.
- */
-static int send_pose_to_port(int sock, const struct stewart_pose *pose,
-			     enum stewart_robot_type robot_type, int port)
-{
-	struct sockaddr_in addr;
-	struct viz_pose_packet packet;
-	ssize_t sent;
-
-	/* Pakk stewart_pose inn i viz_pose_packet */
-	packet.magic = VIZ_MAGIC;
-	packet.type = VIZ_PACKET_POSE;
-	packet.robot_type = robot_type;
-	packet.rx = pose->rx;
-	packet.ry = pose->ry;
-	packet.rz = pose->rz;
-	packet.tx = pose->tx;
-	packet.ty = pose->ty;
-	packet.tz = pose->tz;
-
-	/* Sett opp destinasjonsadresse */
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
-	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-	/* Send pakke */
-	sent = sendto(sock, &packet, sizeof(packet), 0,
-		      (struct sockaddr *)&addr, sizeof(addr));
-
-	if (sent < 0) {
-		perror("sendto");
-		return -1;
-	}
-
-	return 0;
-}
-
-/**
- * generate_reference_motion - Generer reference pose (målposisjon)
- * @time: tid i sekunder
- * @geometry: robot geometri
- * @ref_pose: output pose
- * @inverse_result: output inverse kinematics resultat
- */
-static void
-generate_reference_motion(float time, const struct stewart_geometry *geometry,
-			  struct stewart_pose *ref_pose,
-			  struct stewart_inverse_result *inverse_result)
-{
+	float off = geometry->home_height;
 	/*
 	 * Varierende bevegelse - rotasjon og translasjon
 	 * Setter det inn i ref_pose, ref_pose skal ikke brukes videre
 	 * i iterasjoner, kun visualiseres
 	 */
-	ref_pose->rx = 5.0f * sinf(time * 0.5f);
-	ref_pose->ry = 5.0f * cosf(time * 0.4f);
-	ref_pose->rz = 3.0f * sinf(time * 0.3f);
+	ref_pose->rx = 0.0f * sinf(time * 0.5f);
+	ref_pose->ry = 0.0f * cosf(time * 0.4f);
+	ref_pose->rz = 0.0f * sinf(time * 0.3f);
 
-	ref_pose->tx = 10.0f * cosf(time * 0.3f);
-	ref_pose->ty = geometry->home_height + 15.0f * sinf(time * 0.5f);
-	ref_pose->tz = 10.0f * sinf(time * 0.4f);
+	ref_pose->tx = 0.0f * cosf(time * 0.3f);
+	ref_pose->ty = off + 10.0f + 60.0f * sinf(3.0f * time * 0.5f);
+	ref_pose->tz = 0.0f * sinf(time * 0.4f);
 
 	/*
 	 * Finner nå kneposisjoner som er utgangspunkt for forward_kinematics.
-	 * Setter inn kneleddpos i inverse_result
+	 * Setter inn kneleddpos i result_inv
 	 */
-	stewart_kinematics_inverse(geometry, ref_pose, inverse_result, 0);
+	stewart_kinematics_inverse(geometry, ref_pose, result_inv, 0);
 	/*
 	 * stewart_kinematics_inverse har så gjort jobben sin og nå skal
 	 * snart stewart_kinematics_forward iterere på kneposisjoner mot
@@ -120,53 +52,28 @@ generate_reference_motion(float time, const struct stewart_geometry *geometry,
 	 */
 }
 
-/**
- * generate_calculated_motion - Generer forward pose
- * @geometry: robot geometri
- * @inverse_result: inverse kinematics resultat (motor vinkler)
- * @forward_result: forward kinematics resultat buffer
- * @calc_pose: output - beregnet pose fra forward kinematics
- *
- * Tar inverse kinematics resultat (motor vinkler) og itererer forward
- * kinematics for å beregne faktisk pose. Starter fra home-posisjon for å
- * simulere konvergens.
- */
 static void
 generate_calculated_motion(const struct stewart_geometry *geometry,
 			   const struct stewart_inverse_result *inverse_result,
 			   struct stewart_forward_result *forward_result,
 			   struct stewart_pose *calc_pose)
 {
-
-	/*
-	 * Itererer, basert på faste kneledd pos (inverse_result) og
-	 * fast platform pos (ref_pose)
-	 */
-	for (int i = 0; i < 20; i++) {
-		stewart_kinematics_forward(geometry, &calc_pose,
-					   &inverse_result, &forward_result);
-
-		// ++++ result_inv->platform_points_transformed
-		calculate_transformed_platform_points(active_robot, &pose_calc,
-						      &result_inv);
-	}
-
-	int i;
-
+	float off = geometry->home_height;
 	/*
 	 * Start forward kinematics fra home-posisjon
 	 * (simulerer at robot starter fra null og konvergerer)
 	 */
-	calc_pose->rx = 0.0f;
-	calc_pose->ry = 0.0f;
-	calc_pose->rz = 0.0f;
-	calc_pose->tx = 0.0f;
-	calc_pose->ty = 0.0f;
-	calc_pose->tz = 0.0f;
+	forward_result->pose_result.rx = 0.0f;
+	forward_result->pose_result.ry = 0.0f;
+	forward_result->pose_result.rz = 0.0f;
+	forward_result->pose_result.tx = 0.0f;
+	forward_result->pose_result.ty = off;
+	forward_result->pose_result.tz = 0.0f;
 
-	/* Iterer forward kinematics for å finne konvergert pose */
-	for (i = 0; i < 50; i++) {
-		stewart_kinematics_forward(geometry, calc_pose, inverse_result,
+	/* Iterer forward kinematics for å finne konvergert pose (50
+	 * iterasjoner) */
+	for (int i = 0; i < 50; i++) {
+		stewart_kinematics_forward(geometry, inverse_result,
 					   forward_result);
 	}
 
@@ -193,7 +100,7 @@ int main(void)
 	geometry = ROBOT_MX64;
 
 	/* Lag UDP sender */
-	sock = udp_create_sender();
+	sock = viz_sender_create();
 	if (sock < 0) {
 		fprintf(stderr, "Failed to create UDP sender\n");
 		return 1;
@@ -208,9 +115,9 @@ int main(void)
 					   &forward_result, &pose2);
 
 		/* Send til hver sin port */
-		if (send_pose_to_port(sock, &pose1, ROBOT_TYPE_MX64, 9001) <
+		if (viz_sender_send_pose(sock, &pose1, ROBOT_TYPE_MX64, 9001) <
 			    0 ||
-		    send_pose_to_port(sock, &pose2, ROBOT_TYPE_MX64, 9002) <
+		    viz_sender_send_pose(sock, &pose2, ROBOT_TYPE_MX64, 9002) <
 			    0) {
 			fprintf(stderr, "Failed to send poses\n");
 			break;
