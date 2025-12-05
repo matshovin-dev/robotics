@@ -5,8 +5,8 @@
 #include <string.h>
 
 /* Simulerings-parametere for fjær-modell */
-static const float SPRING_K = 0.2f; /* Fjærkonstant */
-static const float DAMPENING = 0.999f; /* Demping */
+static const float SPRING_K = 0.35f; /* Fjærkonstant */
+static const float DAMPENING = 0.9998f; /* Demping */
 static const float TIMESTEP = 0.01f; /* 10ms timestep */
 
 /**
@@ -62,6 +62,18 @@ calculate_leg_forces(const struct stewart_geometry *geom,
 		 * Negativ error → kraft trekker ut (mot platform)
 		 */
 		force_magnitude = -SPRING_K * length_error;
+
+		/*
+		 * Begrens kraft for å forhindre ustabilitet ved ekstreme
+		 * posisjoner. Ved store length_error (f.eks. ved clamping) kan
+		 * kreftene bli så store at de gir numerisk ustabilitet.
+		 */
+		const float MAX_FORCE_MAGNITUDE = 15.0f;
+		if (force_magnitude > MAX_FORCE_MAGNITUDE) {
+			force_magnitude = MAX_FORCE_MAGNITUDE;
+		} else if (force_magnitude < -MAX_FORCE_MAGNITUDE) {
+			force_magnitude = -MAX_FORCE_MAGNITUDE;
+		}
 
 		result_forv->leg_force_vectors[i] = leg_direction;
 		vec3_scale(&result_forv->leg_force_vectors[i], force_magnitude);
@@ -137,16 +149,11 @@ void stewart_kinematics_forward(const struct stewart_geometry *geom,
 
 	struct vec3 total_force, total_moment;
 
-	/*
-	 * Initialiser iterative platform punkter fra posen (IKKE fra
-	 * result_inv->platform_points_transformed).
-	 * Dette er kritisk når motor-vinkler er clamped, da
-	 * platform_points_transformed fra inverse ikke lenger stemmer med
-	 * knee_points.
-	 */
-	calculate_transformed_platform_points(
-		geom, &result_forv->pose_result,
-		result_forv->platform_points_iter);
+	/* Initialiser iterative platform punkter fra input */
+	for (int i = 0; i < 6; i++) {
+		result_forv->platform_points_iter[i] =
+			result_inv->platform_points_transformed[i];
+	}
 
 	int number_of_iterations = 20;
 	for (int i = 0; i < number_of_iterations; i++) {

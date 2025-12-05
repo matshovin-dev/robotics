@@ -85,13 +85,11 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
 		if (camera_elevation < -89.0f)
 			camera_elevation = -89.0f;
 		break;
-	case GLFW_KEY_EQUAL: /* + key */
 	case GLFW_KEY_Q:
 		ortho_scale *= 0.9f;
 		if (ortho_scale < 50.0f)
 			ortho_scale = 50.0f;
 		break;
-	case GLFW_KEY_MINUS: /* - key */
 	case GLFW_KEY_W:
 		ortho_scale *= 1.1f;
 		if (ortho_scale > 2000.0f)

@@ -200,17 +200,19 @@ static void calculate_motor_angle(int motor_no,
 	/* Konverter til grader */
 	result_inv->motor_angles_deg[motor_no] = rad_to_deg(motor_angle_rad);
 
-	/* Hard clamp til geometri-grenser */
+	/* Clamp til geometri-grenser og sett flag hvis clamping skjer */
 	if (motor_no & 1) { /* 1, 3, 5 */
 		result_inv->motor_angles_deg[motor_no] =
 			soft_clamp(result_inv->motor_angles_deg[motor_no],
 				   geom->min_motor_angle_135_deg,
-				   geom->max_motor_angle_135_deg, 10.0f);
+				   geom->max_motor_angle_135_deg, 8.0f,
+				   &result_inv->clamped);
 	} else { /* 0, 2, 4 */
 		result_inv->motor_angles_deg[motor_no] =
 			soft_clamp(result_inv->motor_angles_deg[motor_no],
 				   geom->min_motor_angle_024_deg,
-				   geom->max_motor_angle_024_deg, 10.0f);
+				   geom->max_motor_angle_024_deg, 8.0f,
+				   &result_inv->clamped);
 	}
 }
 
@@ -297,16 +299,8 @@ void stewart_kinematics_inverse(const struct stewart_geometry *geom,
 	for (i = 0; i < 6; i++)
 		calculate_motor_angle(i, geom, result_inv, debug);
 
-	/* Beregn kne posisjoner fra (potensielt clampede) motor-vinkler */
+	/* Beregn kne posisjoner */
 	calculate_knee_positions(geom, result_inv);
-
-	/*
-	 * VIKTIG: Etter clamping stemmer ikke lenger
-	 * platform_points_transformed med de faktiske knee_points.
-	 * Forward kinematics MÅ derfor generere sine egne
-	 * platform_points_transformed fra den iterative posen for å unngå
-	 * store fjærkrefter og ustabilitet.
-	 */
 }
 
 /*

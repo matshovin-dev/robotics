@@ -12,17 +12,20 @@
  * @knee_points[6] vec3 (mm) - Kne posisjoner
  * @platform_points_transformed[6] vec3 (mm) - Transformerte punkter
  * @error int - 0=success, 1=NaN detected
+ * @clamped int - 0=ingen clamping, 1=en eller flere motorer ble clamped
  *
  * Inneholder alle beregnede verdier fra inverse kinematics.
  * Beregnes fra ønsket platform pose.
  *
  * @note Alle arrays indeksert 0-5 for motor nummer
+ * @note clamped=1 indikerer at posen var utenfor workspace og ble justert
  */
 struct stewart_inverse_result {
 	float motor_angles_deg[6];
 	struct vec3 knee_points[6];
 	struct vec3 platform_points_transformed[6];
 	int error;
+	int clamped;
 };
 
 /**

@@ -37,10 +37,13 @@ VIZ_OBJ = $(BUILD_DIR)/main.o
 OBJ = $(MATH_OBJ) $(STEWART_OBJ) $(VIZ_COMMON_OBJ) $(VIZ_OBJ)
 
 # Default target
-all: viz-stewart-kinematics
+all: plot_stw_polygon
 
-viz-stewart-kinematics: $(OBJ)
+plot_stw_polygon: $(OBJ)
 	$(CC) -o $@ $(OBJ) $(LDFLAGS)
+
+test_animation: test_animation.c ../common/src/viz_sender.c ../common/src/udp.c $(BUILD_DIR)/stewart_geometry.o | $(BUILD_DIR)
+	$(CC) $(CFLAGS) $^ -o $@ -lm
 
 # Build math library objects
 $(BUILD_DIR)/math_%.o: $(MATH_LIB)/src/%.c | $(BUILD_DIR)
@@ -63,9 +66,12 @@ $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 clean:
-	rm -rf $(BUILD_DIR) viz-stewart-kinematics
+	rm -rf $(BUILD_DIR) plot_stw_polygon test_animation
 
-run: viz-stewart-kinematics
-	./viz-stewart-kinematics
+run: plot_stw_polygon
+	./plot_stw_polygon
 
-.PHONY: all clean run
+test: test_animation
+	./test_animation
+
+.PHONY: all clean run test

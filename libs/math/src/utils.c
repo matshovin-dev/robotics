@@ -37,22 +37,31 @@ float normalize_angle_positive(float angle_rad)
 	return angle_rad;
 }
 
-float clamp(float value, float min, float max)
+float clamp(float value, float min, float max, int *was_clamped)
 {
-	if (value < min)
+	if (value < min) {
+		if (was_clamped)
+			*was_clamped = 1;
 		return min;
-	if (value > max)
+	}
+	if (value > max) {
+		if (was_clamped)
+			*was_clamped = 1;
 		return max;
+	}
 	return value;
 }
 
-float soft_clamp(float value, float min, float max, float margin)
+float soft_clamp(float value, float min, float max, float margin,
+		 int *was_clamped)
 {
 	/*
 	 * Soft clamp med eksponentiell dampening nær grensene.
 	 * Innenfor margin-området brukes eksponentiell funksjon for smooth overgang.
 	 */
 	if (value > max - margin) {
+		if (was_clamped)
+			*was_clamped = 1;
 		/* Eksponentiell tilnærming mot max */
 		float excess = value - (max - margin);
 		float damped = margin * (1.0f - expf(-excess / margin));
@@ -60,6 +69,8 @@ float soft_clamp(float value, float min, float max, float margin)
 	}
 
 	if (value < min + margin) {
+		if (was_clamped)
+			*was_clamped = 1;
 		/* Eksponentiell tilnærming mot min */
 		float excess = (min + margin) - value;
 		float damped = margin * (1.0f - expf(-excess / margin));

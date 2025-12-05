@@ -36,30 +36,37 @@ float rad_to_deg(float radians);
  * @function clamp
  * @api PUBLIC
  *
- * @input  value   float
- * @input  min     float
- * @input  max     float
- * @output return  float (clamped to [min, max])
+ * @input  value       float
+ * @input  min         float
+ * @input  max         float
+ * @input  was_clamped int* (optional, kan være NULL)
+ * @output return      float (clamped to [min, max])
  *
  * Begrenser verdi til området [min, max].
  * Hard clamp uten dampening.
+ *
+ * Hvis was_clamped != NULL, settes *was_clamped = 1 hvis clamping skjedde.
  */
-float clamp(float value, float min, float max);
+float clamp(float value, float min, float max, int *was_clamped);
 
 /**
  * @function soft_clamp
  * @api PUBLIC
  *
- * @input  value   float
- * @input  min     float
- * @input  max     float
- * @input  margin  float
- * @output return  float (soft clamped)
+ * @input  value       float
+ * @input  min         float
+ * @input  max         float
+ * @input  margin      float
+ * @input  was_clamped int* (optional, kan være NULL)
+ * @output return      float (soft clamped)
  *
  * Soft clamp med eksponentiell dampening nær grenser.
  * Innenfor margin-området: smooth dampening.
  * Utenfor margin: hard clamp.
+ *
+ * Hvis was_clamped != NULL, settes *was_clamped = 1 hvis clamping skjedde.
  */
-float soft_clamp(float value, float min, float max, float margin);
+float soft_clamp(float value, float min, float max, float margin,
+		 int *was_clamped);
 
 #endif /* ROBOTICS_MATH_UTILS_H */

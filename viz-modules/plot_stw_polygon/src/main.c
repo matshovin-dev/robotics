@@ -29,30 +29,8 @@ static int has_error = 0;
 /* Camera state */
 static float camera_azimuth = 45.0f; /* Horizontal rotation (degrees) */
 static float camera_elevation = 30.0f; /* Vertical tilt (degrees) */
-static float camera_distance = 600.0f; /* Distance from target */
 static float ortho_scale = 400.0f; /* Orthographic view scale */
-
-/**
- * draw_sphere - Tegn en sfære på gitt posisjon
- * @x, @y, @z: senterpunkt
- * @radius: radius
- * @slices: antall vertikale segmenter
- * @stacks: antall horisontale segmenter
- *
- * Bruker GLU for å tegne en enkel sfære.
- */
-static void draw_sphere(float x, float y, float z, float radius, int slices,
-			int stacks)
-{
-	GLUquadric *quad;
-
-	quad = gluNewQuadric();
-	glPushMatrix();
-	glTranslatef(x, y, z);
-	gluSphere(quad, radius, slices, stacks);
-	glPopMatrix();
-	gluDeleteQuadric(quad);
-}
+static float camera_center_y = 100.0f; /* Camera look-at Y position */
 
 /**
  * key_callback - Håndter tastatur-input
@@ -92,23 +70,28 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
 		if (camera_elevation < -89.0f)
 			camera_elevation = -89.0f;
 		break;
-	case GLFW_KEY_EQUAL: /* + key */
 	case GLFW_KEY_Q:
 		ortho_scale *= 0.9f;
 		if (ortho_scale < 50.0f)
 			ortho_scale = 50.0f;
 		break;
-	case GLFW_KEY_MINUS: /* - key */
 	case GLFW_KEY_W:
 		ortho_scale *= 1.1f;
 		if (ortho_scale > 2000.0f)
 			ortho_scale = 2000.0f;
+		break;
+	case GLFW_KEY_A:
+		camera_center_y -= 10.0f;
+		break;
+	case GLFW_KEY_S:
+		camera_center_y += 10.0f;
 		break;
 	case GLFW_KEY_R:
 		/* Reset kamera */
 		camera_azimuth = 45.0f;
 		camera_elevation = 30.0f;
 		ortho_scale = 400.0f;
+		camera_center_y = 100.0f;
 		printf("Camera reset\n");
 		break;
 	case GLFW_KEY_ESCAPE:
@@ -118,19 +101,19 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
 }
 
 /**
- * render_stewart_kinematics - Render Stewart platform med kinematikk
+ * plot_stw_polygon - Render Stewart platform med kinematikk
  *
  * Tegner:
  * - Base sekskant (blå)
  * - Platform sekskant (rød)
- * - Motor arms (gul: base → knee)
- * - Pushrods (oransje: knee → platform)
- * - Knee points (grønne kuler)
+ * - Motor arms (grå: base → knee)
+ * - Pushrods (grå: knee → platform)
+ * - Knee points (små kuler)
  * - Koordinatsystem
  *
- * Viser faktisk kinematikk fra inverse beregning.
+ * Viser faktisk kinematikk fra inverse beregning med kneledd.
  */
-static void render_stewart_kinematics(void)
+static void plot_stw_polygon(void)
 {
 	int i;
 	float azimuth_rad, elevation_rad;
@@ -149,21 +132,21 @@ static void render_stewart_kinematics(void)
 	glLoadIdentity();
 
 	/* Beregn kamera posisjon fra azimuth og elevation */
-	azimuth_rad = camera_azimuth * M_PI / 180.0f;
-	elevation_rad = camera_elevation * M_PI / 180.0f;
+	float cam_distance = 800.0f;
+	azimuth_rad = deg_to_rad(camera_azimuth);
+	elevation_rad = deg_to_rad(camera_elevation);
 
-	eye_x = camera_distance * cosf(elevation_rad) * cosf(azimuth_rad);
-	eye_y = camera_distance * sinf(elevation_rad);
-	eye_z = camera_distance * cosf(elevation_rad) * sinf(azimuth_rad);
+	eye_x = cam_distance * cosf(elevation_rad) * cosf(azimuth_rad);
+	eye_y = cam_distance * sinf(elevation_rad);
+	eye_z = cam_distance * cosf(elevation_rad) * sinf(azimuth_rad);
 
-	/* Kamera ser på (0, 100, 0) - midt på Stewart platform */
-	gluLookAt(eye_x, eye_y + 100.0f, eye_z, /* eye */
-		  0.0, 100.0, 0.0, /* center */
+	gluLookAt(eye_x, eye_y, eye_z, /* eye */
+		  0.0, camera_center_y, 0.0, /* center */
 		  0.0, 1.0, 0.0); /* up */
 
 	/* Tegn base sekskant (blå) */
-	glColor3f(0.4f, 0.4f, 1.0f);
-	glLineWidth(6.0f);
+	glColor3f(0.3f, 0.3f, 0.8f);
+	glLineWidth(2.0f);
 	glBegin(GL_LINE_LOOP);
 	for (i = 0; i < 6; i++) {
 		struct vec3 *p = &geometry.base_points[i];
@@ -171,15 +154,9 @@ static void render_stewart_kinematics(void)
 	}
 	glEnd();
 
-	/* Tegn platform sekskant (hvit hvis ok, rød blink hvis error) */
-	if (has_error) {
-		/* Blink rød hvis error */
-		float intensity = 0.5f + 0.5f * sinf(glfwGetTime() * 5.0f);
-		glColor3f(1.0f, intensity * 0.2f, intensity * 0.2f);
-	} else {
-		glColor3f(1.0f, 1.0f, 1.0f);
-	}
-	glLineWidth(6.0f);
+	/* Tegn platform sekskant (rød) */
+	glColor3f(0.8f, 0.3f, 0.3f);
+	glLineWidth(2.0f);
 	glBegin(GL_LINE_LOOP);
 	for (i = 0; i < 6; i++) {
 		struct vec3 *p = &inverse_result.platform_points_transformed[i];
@@ -187,40 +164,28 @@ static void render_stewart_kinematics(void)
 	}
 	glEnd();
 
-	/* Tegn motor arms (gul: base → knee) */
-	glColor3f(0.9f, 0.9f, 0.2f);
-	glLineWidth(2.0f);
+	/* Tegn ben (grå linjer: base → knee → platform) */
+	glColor3f(0.5f, 0.5f, 0.5f);
+	glLineWidth(1.5f);
 	glBegin(GL_LINES);
 	for (i = 0; i < 6; i++) {
 		struct vec3 *base = &geometry.base_points[i];
 		struct vec3 *knee = &inverse_result.knee_points[i];
-		glVertex3f(base->x, base->y, base->z);
-		glVertex3f(knee->x, knee->y, knee->z);
-	}
-	glEnd();
-
-	/* Tegn pushrods (oransje: knee → platform) */
-	glColor3f(1.0f, 0.5f, 0.1f);
-	glLineWidth(2.0f);
-	glBegin(GL_LINES);
-	for (i = 0; i < 6; i++) {
-		struct vec3 *knee = &inverse_result.knee_points[i];
 		struct vec3 *platform =
 			&inverse_result.platform_points_transformed[i];
+
+		/* Motor arm: base → knee */
+		glVertex3f(base->x, base->y, base->z);
+		glVertex3f(knee->x, knee->y, knee->z);
+
+		/* Pushrod: knee → platform */
 		glVertex3f(knee->x, knee->y, knee->z);
 		glVertex3f(platform->x, platform->y, platform->z);
 	}
 	glEnd();
 
-	/* Tegn knee points (grønne kuler) */
-	glColor3f(0.2f, 0.9f, 0.2f);
-	for (i = 0; i < 6; i++) {
-		struct vec3 *knee = &inverse_result.knee_points[i];
-		draw_sphere(knee->x, knee->y, knee->z, 5.0f, 12, 12);
-	}
-
 	/* Tegn koordinatsystem i origo */
-	glLineWidth(4.0f);
+	glLineWidth(3.0f);
 	glBegin(GL_LINES);
 	/* X-akse (rød) */
 	glColor3f(1.0f, 0.0f, 0.0f);
@@ -320,11 +285,11 @@ int main(void)
 {
 	GLFWwindow *window;
 
-	printf("Stewart Platform Kinematics Visualizer\n");
-	printf("======================================\n\n");
+	printf("Stewart Platform Visualizer (with kinematics)\n");
+	printf("=============================================\n\n");
 
 	/* Initialiser geometry til MX64 (default) */
-	geometry = ROBOT_MX64;
+	geometry = ROBOT_MX64;	// ROBOT_MX64 ROBOT_AX18
 
 	/* Initialiser current_pose til home */
 	memset(&current_pose, 0, sizeof(current_pose));
@@ -351,7 +316,7 @@ int main(void)
 	}
 
 	/* Lag vindu */
-	window = glfwCreateWindow(1024, 768, "Stewart Kinematics", NULL, NULL);
+	window = glfwCreateWindow(1024, 768, "Stewart Platform", NULL, NULL);
 	if (!window) {
 		fprintf(stderr, "Failed to create window\n");
 		glfwTerminate();
@@ -368,17 +333,18 @@ int main(void)
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
 
-	printf("Window created. Ready to visualize!\n");
-	printf("\nControls:\n");
-	printf("  Arrow keys:  Rotate camera\n");
-	printf("  +/-:         Zoom in/out\n");
-	printf("  R:           Reset camera\n");
-	printf("  ESC:         Exit\n\n");
+	printf("Window created. Listening for UDP packets...\n");
+	printf("Camera controls:\n");
+	printf("  Arrow keys: Rotate camera\n");
+	printf("  Q/W: Zoom in/out\n");
+	printf("  A/S: Lower/raise platform relative to camera\n");
+	printf("  R: Reset camera\n");
+	printf("  ESC: Exit\n\n");
 
 	/* Main loop */
 	while (!glfwWindowShouldClose(window)) {
 		poll_udp();
-		render_stewart_kinematics();
+		plot_stw_polygon();
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

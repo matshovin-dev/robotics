@@ -37,7 +37,7 @@ static void generate_reference_motion(float time,
 	ref_pose->rz = 0.0f * sinf(time * 0.3f);
 
 	ref_pose->tx = 0.0f * cosf(time * 0.3f);
-	ref_pose->ty = off + 10.0f + 60.0f * sinf(3.0f * time * 0.5f);
+	ref_pose->ty = off + 35.0f + 60.0f * sinf(0.5f * time * 0.5f);
 	ref_pose->tz = 0.0f * sinf(time * 0.4f);
 
 	/*
