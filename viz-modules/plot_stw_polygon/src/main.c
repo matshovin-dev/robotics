@@ -27,9 +27,9 @@ static int udp_sock = -1;
 static int has_error = 0;
 
 /* Camera state */
-static float camera_azimuth = 45.0f; /* Horizontal rotation (degrees) */
+static float camera_azimuth = 90.0f; /* Horizontal rotation (degrees) */
 static float camera_elevation = 30.0f; /* Vertical tilt (degrees) */
-static float ortho_scale = 400.0f; /* Orthographic view scale */
+static float ortho_scale = 200.0f; /* Orthographic view scale */
 static float camera_center_y = 100.0f; /* Camera look-at Y position */
 
 /**
@@ -61,12 +61,12 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
 		camera_azimuth += 5.0f;
 		break;
 	case GLFW_KEY_UP:
-		camera_elevation += 5.0f;
+		camera_elevation -= 5.0f;
 		if (camera_elevation > 89.0f)
 			camera_elevation = 89.0f;
 		break;
 	case GLFW_KEY_DOWN:
-		camera_elevation -= 5.0f;
+		camera_elevation += 5.0f;
 		if (camera_elevation < -89.0f)
 			camera_elevation = -89.0f;
 		break;
@@ -289,7 +289,7 @@ int main(void)
 	printf("=============================================\n\n");
 
 	/* Initialiser geometry til MX64 (default) */
-	geometry = ROBOT_MX64;	// ROBOT_MX64 ROBOT_AX18
+	geometry = ROBOT_AX18; /* er bare et utgangspunkt */
 
 	/* Initialiser current_pose til home */
 	memset(&current_pose, 0, sizeof(current_pose));
@@ -316,7 +316,7 @@ int main(void)
 	}
 
 	/* Lag vindu */
-	window = glfwCreateWindow(1024, 768, "Stewart Platform", NULL, NULL);
+	window = glfwCreateWindow(600, 400, "Stewart Platform", NULL, NULL);
 	if (!window) {
 		fprintf(stderr, "Failed to create window\n");
 		glfwTerminate();

@@ -42,10 +42,10 @@ static struct stewart_geometry current_geom;
 static int udp_sock = -1;
 
 /* Kamera variabler */
-static float camera_azimuth = 45.0f;
-static float camera_elevation = 30.0f;
-static float ortho_scale = 400.0f;
-static float camera_center_y = 100.0f;
+static float camera_azimuth = 90.0f; /* Horizontal rotation (degrees) */
+static float camera_elevation = 30.0f; /* Vertical tilt (degrees) */
+static float ortho_scale = 200.0f; /* Orthographic view scale */
+static float camera_center_y = 100.0f; /* Camera look-at Y position */
 
 /**
  * transform_point - Transformer punkt med pose
@@ -101,12 +101,12 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
 		camera_azimuth += 5.0f;
 		break;
 	case GLFW_KEY_UP:
-		camera_elevation += 5.0f;
+		camera_elevation -= 5.0f;
 		if (camera_elevation > 89.0f)
 			camera_elevation = 89.0f;
 		break;
 	case GLFW_KEY_DOWN:
-		camera_elevation -= 5.0f;
+		camera_elevation += 5.0f;
 		if (camera_elevation < -89.0f)
 			camera_elevation = -89.0f;
 		break;
