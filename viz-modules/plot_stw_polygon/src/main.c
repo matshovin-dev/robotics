@@ -281,9 +281,14 @@ static void poll_udp(void)
 	}
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
 	GLFWwindow *window;
+	int port = VIZ_PORT_POLYGON;
+
+	/* Optional port argument */
+	if (argc > 1)
+		port = atoi(argv[1]);
 
 	printf("Stewart Platform Visualizer (with kinematics)\n");
 	printf("=============================================\n\n");
@@ -301,13 +306,13 @@ int main(void)
 	compute_kinematics();
 
 	/* Lag UDP receiver */
-	udp_sock = udp_create_receiver(VIZ_PORT);
+	udp_sock = udp_create_receiver(port);
 	if (udp_sock < 0) {
 		fprintf(stderr, "Failed to create UDP receiver\n");
 		return 1;
 	}
 
-	printf("Listening on UDP port %d...\n\n", VIZ_PORT);
+	printf("Listening on UDP port %d...\n\n", port);
 
 	/* Initialiser GLFW */
 	if (!glfwInit()) {

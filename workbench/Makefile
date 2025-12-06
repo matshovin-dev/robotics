@@ -10,7 +10,8 @@ LDFLAGS = -lm
 # Object files from other libraries
 MOVE_LIB = ../libs/move_lib/build/move_lib.o
 STEWART_GEOM = ../platforms/stewart/build/geometry.o
-VIZ_SENDER = ../viz-modules/common/src/viz_sender.c \
+VIZ_COMMON = ../viz-modules/common/src/viz_sender.c \
+             ../viz-modules/common/src/viz_status.c \
              ../viz-modules/common/src/udp.c
 
 DEPS = $(MOVE_LIB) $(STEWART_GEOM)
@@ -24,10 +25,10 @@ deps:
 	$(MAKE) -C ../platforms/stewart
 
 wb_move_test: wb_move_test.c $(DEPS)
-	$(CC) $(CFLAGS) $< $(DEPS) $(VIZ_SENDER) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $< $(DEPS) $(VIZ_COMMON) -o $@ $(LDFLAGS)
 
 wb_mixer_test: wb_mixer_test.c $(DEPS)
-	$(CC) $(CFLAGS) $< $(DEPS) $(VIZ_SENDER) -o $@ $(LDFLAGS)
+	$(CC) $(CFLAGS) $< $(DEPS) $(VIZ_COMMON) -o $@ $(LDFLAGS)
 
 clean:
 	rm -f wb_move_test wb_mixer_test

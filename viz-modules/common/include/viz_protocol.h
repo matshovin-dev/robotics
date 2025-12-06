@@ -1,9 +1,10 @@
 #ifndef VIZ_PROTOCOL_H
 #define VIZ_PROTOCOL_H
 
+#include "viz_ports.h"
 #include <stdint.h>
 
-#define VIZ_PORT 9001
+#define VIZ_PORT VIZ_PORT_POLYGON  /* Default port for backwards compat */
 #define VIZ_MAGIC 0x53545750 /* "STWP" */
 
 /**

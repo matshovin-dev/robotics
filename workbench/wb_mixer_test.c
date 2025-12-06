@@ -21,6 +21,7 @@
 #include "stewart/geometry.h"
 #include "stewart/pose.h"
 #include "viz_sender.h"
+#include "viz_status.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -69,6 +70,7 @@ int main(void)
 	char cmd[32];
 	float value;
 	int running = 1;
+	struct viz_status status;
 
 	/* Initialize */
 	move_lib_init();
@@ -85,6 +87,12 @@ int main(void)
 	sock = viz_sender_create();
 	if (sock < 0) {
 		fprintf(stderr, "Failed to create UDP sender\n");
+		return 1;
+	}
+
+	/* Create status sender */
+	if (viz_status_init(&status) < 0) {
+		fprintf(stderr, "Failed to create status sender\n");
 		return 1;
 	}
 
@@ -149,12 +157,22 @@ int main(void)
 		/* Add home height to ty */
 		pose.ty += geom->home_height;
 
-		/* Send */
+		/* Send pose */
 		viz_sender_send_pose(sock, &pose, ROBOT_TYPE_MX64, VIZ_PORT);
+
+		/* Send status */
+		viz_status_set(&status, "bpm", move_playback.bpm);
+		viz_status_set(&status, "crossfader", move_mixer.crossfader);
+		viz_status_set(&status, "deckA", move_mixer.deck_a);
+		viz_status_set(&status, "deckB", move_mixer.deck_b);
+		viz_status_set(&status, "volumeA", move_mixer.volume_a);
+		viz_status_set(&status, "volumeB", move_mixer.volume_b);
+		viz_status_send(&status);
 
 		usleep(16000);
 	}
 
+	viz_status_close(&status);
 	printf("\nGoodbye!\n");
 	return 0;
 }

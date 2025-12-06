@@ -25,7 +25,7 @@
 
 int main(int argc, char *argv[])
 {
-	int move_index = 4; /* Default: bounce */
+	int move_index = 8; /* Default: bounce */
 	float bpm = 120.0f;
 	int sock;
 	struct timeval last, now;
