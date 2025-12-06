@@ -25,12 +25,11 @@
 
 int main(int argc, char *argv[])
 {
-	int move_index = 4;  /* Default: bounce */
+	int move_index = 4; /* Default: bounce */
 	float bpm = 120.0f;
 	int sock;
 	struct timeval last, now;
-	struct move_pose pose;
-	struct stewart_pose stw_pose;
+	struct stewart_pose pose;
 	const struct stewart_geometry *geom = &ROBOT_MX64;
 
 	/* Parse arguments */
@@ -40,14 +39,14 @@ int main(int argc, char *argv[])
 		bpm = atof(argv[2]);
 
 	if (move_index < 0 || move_index >= MOVE_LIB_SIZE) {
-		fprintf(stderr, "Invalid move index (0-%d)\n", MOVE_LIB_SIZE - 1);
+		fprintf(stderr, "Invalid move index (0-%d)\n",
+			MOVE_LIB_SIZE - 1);
 		return 1;
 	}
 
 	/* Initialize */
 	move_lib_init();
 	move_playback.bpm = bpm;
-	move_playback.master_volume = 1.0f;
 
 	/* Create UDP sender */
 	sock = viz_sender_create();
@@ -77,18 +76,14 @@ int main(int argc, char *argv[])
 		move_playback_tick(&move_playback, dt);
 
 		/* Evaluate move */
-		move_evaluate_single(move_index, &pose);
+		move_evaluate(&move_lib[move_index], &move_playback, geom,
+			      &pose);
 
-		/* Convert to stewart_pose (add home height to ty) */
-		stw_pose.rx = pose.rx;
-		stw_pose.ry = pose.ry;
-		stw_pose.rz = pose.rz;
-		stw_pose.tx = pose.tx;
-		stw_pose.ty = geom->home_height + pose.ty;
-		stw_pose.tz = pose.tz;
+		/* Add home height to ty */
+		pose.ty += geom->home_height;
 
 		/* Send to visualizer */
-		viz_sender_send_pose(sock, &stw_pose, ROBOT_TYPE_MX64, VIZ_PORT);
+		viz_sender_send_pose(sock, &pose, ROBOT_TYPE_MX64, VIZ_PORT);
 
 		usleep(16000); /* ~60 Hz */
 	}

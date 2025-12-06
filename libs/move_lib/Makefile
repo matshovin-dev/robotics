@@ -1,5 +1,7 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -O2 -I include
+CFLAGS = -Wall -Wextra -std=c11 -O2 -I include \
+	-I ../../platforms/stewart/include \
+	-I ../../libs/math/include
 
 SRC_DIR = src
 BUILD_DIR = build

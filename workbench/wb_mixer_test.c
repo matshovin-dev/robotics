@@ -9,7 +9,8 @@
  *   a <n>    - Set deck A to move n
  *   b <n>    - Set deck B to move n
  *   x <0-1>  - Set crossfader (0=A, 1=B)
- *   p <0-1>  - Set phase offset for B
+ *   va <0-1> - Set volume for deck A
+ *   vb <0-1> - Set volume for deck B
  *   bpm <n>  - Set BPM
  *   swap     - Swap decks
  *   list     - List preset moves
@@ -38,12 +39,13 @@ static int has_input(void)
 
 static void print_status(void)
 {
-	printf("\r[A:%d %s] ---(%.2f)--- [B:%d %s]  BPM:%.0f  phase:%.2f   ",
+	printf("\r[A:%d %s v=%.1f] ---(%.2f)--- [B:%d %s v=%.1f]  BPM:%.0f   ",
 	       move_mixer.deck_a, move_lib[move_mixer.deck_a].name,
+	       move_mixer.volume_a,
 	       move_mixer.crossfader,
 	       move_mixer.deck_b, move_lib[move_mixer.deck_b].name,
-	       move_playback.bpm,
-	       move_mixer.phase_offset_b);
+	       move_mixer.volume_b,
+	       move_playback.bpm);
 	fflush(stdout);
 }
 
@@ -61,8 +63,7 @@ int main(void)
 {
 	int sock;
 	struct timeval last, now;
-	struct move_pose pose;
-	struct stewart_pose stw_pose;
+	struct stewart_pose pose;
 	const struct stewart_geometry *geom = &ROBOT_MX64;
 	char line[256];
 	char cmd[32];
@@ -72,7 +73,6 @@ int main(void)
 	/* Initialize */
 	move_lib_init();
 	move_playback.bpm = 120.0f;
-	move_playback.master_volume = 1.0f;
 
 	/* Default mixer setup */
 	move_mixer.deck_a = 4;  /* bounce */
@@ -90,7 +90,7 @@ int main(void)
 
 	printf("Move Mixer Test\n");
 	printf("===============\n");
-	printf("Commands: a <n>, b <n>, x <0-1>, p <0-1>, bpm <n>, swap, list, q\n\n");
+	printf("Commands: a <n>, b <n>, x <0-1>, va <0-1>, vb <0-1>, bpm <n>, swap, list, q\n\n");
 
 	list_presets();
 	print_status();
@@ -116,9 +116,12 @@ int main(void)
 					} else if (strcmp(cmd, "x") == 0) {
 						if (sscanf(line, "%*s %f", &value) == 1)
 							move_mixer_set_crossfade(&move_mixer, value);
-					} else if (strcmp(cmd, "p") == 0) {
+					} else if (strcmp(cmd, "va") == 0) {
 						if (sscanf(line, "%*s %f", &value) == 1)
-							move_mixer_set_phase_offset(&move_mixer, value);
+							move_mixer.volume_a = value;
+					} else if (strcmp(cmd, "vb") == 0) {
+						if (sscanf(line, "%*s %f", &value) == 1)
+							move_mixer.volume_b = value;
 					} else if (strcmp(cmd, "bpm") == 0) {
 						if (sscanf(line, "%*s %f", &value) == 1)
 							move_playback.bpm = value;
@@ -141,18 +144,13 @@ int main(void)
 		move_playback_tick(&move_playback, dt);
 
 		/* Evaluate mixer */
-		move_evaluate_mixer(&pose);
+		move_evaluate_mixed(&move_mixer, &move_playback, geom, &pose);
 
-		/* Convert to stewart_pose */
-		stw_pose.rx = pose.rx;
-		stw_pose.ry = pose.ry;
-		stw_pose.rz = pose.rz;
-		stw_pose.tx = pose.tx;
-		stw_pose.ty = geom->home_height + pose.ty;
-		stw_pose.tz = pose.tz;
+		/* Add home height to ty */
+		pose.ty += geom->home_height;
 
 		/* Send */
-		viz_sender_send_pose(sock, &stw_pose, ROBOT_TYPE_MX64, VIZ_PORT);
+		viz_sender_send_pose(sock, &pose, ROBOT_TYPE_MX64, VIZ_PORT);
 
 		usleep(16000);
 	}

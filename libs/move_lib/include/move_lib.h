@@ -17,12 +17,6 @@
 #ifndef MOVE_LIB_H
 #define MOVE_LIB_H
 
-#include <stdint.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*
  * Configuration
  */
@@ -49,7 +43,7 @@ struct move_harmonic {
  */
 struct move_dof {
 	struct move_harmonic h[MOVE_NUM_HARMONICS];
-	float bias;  /* -0.5 to +0.5, scaled by max_bias */
+	float bias;  /* -1.0 to +1.0, scaled by max_bias */
 };
 
 /*
@@ -61,22 +55,23 @@ struct move_dof {
 #define MOVE_FLAG_PRESET      (1 << 3)  /* Factory preset, don't overwrite */
 
 /*
+ * DOF indices
+ */
+#define DOF_RX 0
+#define DOF_RY 1
+#define DOF_RZ 2
+#define DOF_TX 3
+#define DOF_TY 4
+#define DOF_TZ 5
+
+/*
  * Complete move definition
  */
 struct move {
 	char name[MOVE_NAME_LEN];
-
-	/* The 6 degrees of freedom */
-	union {
-		struct {
-			struct move_dof rx, ry, rz;  /* Rotations */
-			struct move_dof tx, ty, tz;  /* Translations */
-		};
-		struct move_dof dof[MOVE_NUM_DOFS];  /* Array access */
-	};
-
-	uint8_t flags;
-	uint8_t category;
+	struct move_dof dof[MOVE_NUM_DOFS];  /* rx, ry, rz, tx, ty, tz */
+	int flags;
+	int category;
 };
 
 /*
@@ -88,7 +83,6 @@ struct move_mixer {
 	float crossfader;     /* 0.0 = only A, 1.0 = only B */
 	float volume_a;       /* Volume for deck A (0.0 - 1.0) */
 	float volume_b;       /* Volume for deck B (0.0 - 1.0) */
-	float phase_offset_b; /* Phase offset for B relative to A (0.0 - 1.0) */
 };
 
 /*
@@ -98,25 +92,6 @@ struct move_playback {
 	float t;              /* Accumulated time (seconds) */
 	float bpm;            /* Beats per minute */
 	float master_phase;   /* Global phase offset (radians) */
-	float master_volume;  /* Global volume (0.0 - 1.0) */
-};
-
-/*
- * Output pose
- */
-struct move_pose {
-	float rx, ry, rz;     /* Rotations (degrees) */
-	float tx, ty, tz;     /* Translations (mm) */
-};
-
-/*
- * Scaling limits - configurable per robot
- */
-struct move_limits {
-	float max_rot_amp;    /* Max rotation amplitude (degrees) */
-	float max_rot_bias;   /* Max rotation bias (degrees) */
-	float max_trans_amp;  /* Max translation amplitude (mm) */
-	float max_trans_bias; /* Max translation bias (mm) */
 };
 
 /*
@@ -125,7 +100,10 @@ struct move_limits {
 extern struct move move_lib[MOVE_LIB_SIZE];
 extern struct move_mixer move_mixer;
 extern struct move_playback move_playback;
-extern struct move_limits move_limits;
+
+/* Forward declarations for stewart types */
+struct stewart_geometry;
+struct stewart_pose;
 
 /*
  * Core evaluation functions
@@ -135,38 +113,25 @@ extern struct move_limits move_limits;
  * move_evaluate - Evaluate a single move at current playback state
  * @m: Pointer to move definition
  * @pb: Pointer to playback state
- * @lim: Pointer to scaling limits
+ * @geom: Pointer to robot geometry (for scaling limits)
  * @out: Output pose
  */
 void move_evaluate(const struct move *m,
 		   const struct move_playback *pb,
-		   const struct move_limits *lim,
-		   struct move_pose *out);
+		   const struct stewart_geometry *geom,
+		   struct stewart_pose *out);
 
 /**
  * move_evaluate_mixed - Evaluate mixer output (crossfade between two moves)
  * @mix: Pointer to mixer state
  * @pb: Pointer to playback state
- * @lim: Pointer to scaling limits
+ * @geom: Pointer to robot geometry (for scaling limits)
  * @out: Output pose
  */
 void move_evaluate_mixed(const struct move_mixer *mix,
 			 const struct move_playback *pb,
-			 const struct move_limits *lim,
-			 struct move_pose *out);
-
-/**
- * move_evaluate_single - Shorthand: evaluate move_lib[index] with globals
- * @index: Move library index
- * @out: Output pose
- */
-void move_evaluate_single(int index, struct move_pose *out);
-
-/**
- * move_evaluate_mixer - Shorthand: evaluate global mixer with globals
- * @out: Output pose
- */
-void move_evaluate_mixer(struct move_pose *out);
+			 const struct stewart_geometry *geom,
+			 struct stewart_pose *out);
 
 /*
  * Phase functions
@@ -209,9 +174,6 @@ void move_mixer_set_deck_b(struct move_mixer *mix, int move_index);
 
 /** Swap decks A and B */
 void move_mixer_swap_decks(struct move_mixer *mix);
-
-/** Set phase offset for deck B (0.0 - 1.0 = 0 - 2π) */
-void move_mixer_set_phase_offset(struct move_mixer *mix, float offset);
 
 /*
  * Move manipulation
@@ -257,9 +219,5 @@ void move_lib_clear(int index);
 
 /** Initialize a range of moves with random values */
 void move_lib_randomize_range(int start, int end, float intensity);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif /* MOVE_LIB_H */

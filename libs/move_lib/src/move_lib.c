@@ -4,6 +4,8 @@
  */
 
 #include "move_lib.h"
+#include "stewart/geometry.h"
+#include "stewart/pose.h"
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -25,21 +27,12 @@ struct move_mixer move_mixer = {
 	.crossfader = 0.0f,
 	.volume_a = 1.0f,
 	.volume_b = 1.0f,
-	.phase_offset_b = 0.0f,
 };
 
 struct move_playback move_playback = {
 	.t = 0.0f,
 	.bpm = 120.0f,
 	.master_phase = 0.0f,
-	.master_volume = 1.0f,
-};
-
-struct move_limits move_limits = {
-	.max_rot_amp = 15.0f,
-	.max_rot_bias = 10.0f,
-	.max_trans_amp = 25.0f,
-	.max_trans_bias = 15.0f,
 };
 
 /*
@@ -54,21 +47,22 @@ float move_phase_1(const struct move_playback *pb)
 float move_phase_05(const struct move_playback *pb)
 {
 	float beats_per_sec = pb->bpm / 60.0f;
-	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.5f + pb->master_phase, TWO_PI);
+	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.5f + pb->master_phase,
+		     TWO_PI);
 }
 
 float move_phase_025(const struct move_playback *pb)
 {
 	float beats_per_sec = pb->bpm / 60.0f;
-	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.25f + pb->master_phase, TWO_PI);
+	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.25f + pb->master_phase,
+		     TWO_PI);
 }
 
 /*
  * Evaluate a single DOF
  */
-static float eval_dof(const struct move_dof *dof,
-		      float phase1, float phase05, float phase025,
-		      float max_amp, float max_bias)
+static float eval_dof(const struct move_dof *dof, float phase1, float phase05,
+		      float phase025, float max_amp, float max_bias)
 {
 	float result = 0.0f;
 
@@ -84,8 +78,8 @@ static float eval_dof(const struct move_dof *dof,
 	result += max_amp * dof->h[2].amplitude *
 		  sinf(phase025 + TWO_PI * dof->h[2].phase);
 
-	/* Bias: centered around 0.5, so (bias - 0.5) gives -0.5 to +0.5 */
-	result += max_bias * (dof->bias - 0.5f);
+	/* Bias: -1.0 to +1.0, directly scaled by max_bias */
+	result += max_bias * dof->bias;
 
 	return result;
 }
@@ -93,45 +87,45 @@ static float eval_dof(const struct move_dof *dof,
 /*
  * Core evaluation
  */
-void move_evaluate(const struct move *m,
-		   const struct move_playback *pb,
-		   const struct move_limits *lim,
-		   struct move_pose *out)
+void move_evaluate(const struct move *m, const struct move_playback *pb,
+		   const struct stewart_geometry *geom,
+		   struct stewart_pose *out)
 {
 	float p1 = move_phase_1(pb);
 	float p05 = move_phase_05(pb);
 	float p025 = move_phase_025(pb);
-	float vol = pb->master_volume;
 
-	out->rx = vol * eval_dof(&m->rx, p1, p05, p025,
-				 lim->max_rot_amp, lim->max_rot_bias);
-	out->ry = vol * eval_dof(&m->ry, p1, p05, p025,
-				 lim->max_rot_amp, lim->max_rot_bias);
-	out->rz = vol * eval_dof(&m->rz, p1, p05, p025,
-				 lim->max_rot_amp, lim->max_rot_bias);
+	out->rx = eval_dof(&m->dof[DOF_RX], p1, p05, p025,
+			   geom->max_pose_rotation_amplitude,
+			   geom->max_pose_rotation_bias);
+	out->ry = eval_dof(&m->dof[DOF_RY], p1, p05, p025,
+			   geom->max_pose_rotation_amplitude,
+			   geom->max_pose_rotation_bias);
+	out->rz = eval_dof(&m->dof[DOF_RZ], p1, p05, p025,
+			   geom->max_pose_rotation_amplitude,
+			   geom->max_pose_rotation_bias);
 
-	out->tx = vol * eval_dof(&m->tx, p1, p05, p025,
-				 lim->max_trans_amp, lim->max_trans_bias);
-	out->ty = vol * eval_dof(&m->ty, p1, p05, p025,
-				 lim->max_trans_amp, lim->max_trans_bias);
-	out->tz = vol * eval_dof(&m->tz, p1, p05, p025,
-				 lim->max_trans_amp, lim->max_trans_bias);
+	out->tx = eval_dof(&m->dof[DOF_TX], p1, p05, p025,
+			   geom->max_pose_translation_amplitude,
+			   geom->max_pose_translation_bias);
+	out->ty = eval_dof(&m->dof[DOF_TY], p1, p05, p025,
+			   geom->max_pose_translation_amplitude,
+			   geom->max_pose_translation_bias);
+	out->tz = eval_dof(&m->dof[DOF_TZ], p1, p05, p025,
+			   geom->max_pose_translation_amplitude,
+			   geom->max_pose_translation_bias);
 }
 
 void move_evaluate_mixed(const struct move_mixer *mix,
 			 const struct move_playback *pb,
-			 const struct move_limits *lim,
-			 struct move_pose *out)
+			 const struct stewart_geometry *geom,
+			 struct stewart_pose *out)
 {
-	struct move_pose a, b;
+	struct stewart_pose a, b;
 
-	/* Evaluate deck A */
-	move_evaluate(&move_lib[mix->deck_a], pb, lim, &a);
-
-	/* Evaluate deck B with phase offset */
-	struct move_playback pb_b = *pb;
-	pb_b.master_phase += TWO_PI * mix->phase_offset_b;
-	move_evaluate(&move_lib[mix->deck_b], &pb_b, lim, &b);
+	/* Evaluate both decks with same phase */
+	move_evaluate(&move_lib[mix->deck_a], pb, geom, &a);
+	move_evaluate(&move_lib[mix->deck_b], pb, geom, &b);
 
 	/* Crossfade with individual volumes */
 	float fa = (1.0f - mix->crossfader) * mix->volume_a;
@@ -143,20 +137,6 @@ void move_evaluate_mixed(const struct move_mixer *mix,
 	out->tx = a.tx * fa + b.tx * fb;
 	out->ty = a.ty * fa + b.ty * fb;
 	out->tz = a.tz * fa + b.tz * fb;
-}
-
-void move_evaluate_single(int index, struct move_pose *out)
-{
-	if (index < 0 || index >= MOVE_LIB_SIZE) {
-		memset(out, 0, sizeof(*out));
-		return;
-	}
-	move_evaluate(&move_lib[index], &move_playback, &move_limits, out);
-}
-
-void move_evaluate_mixer(struct move_pose *out)
-{
-	move_evaluate_mixed(&move_mixer, &move_playback, &move_limits, out);
 }
 
 /*
@@ -214,22 +194,13 @@ void move_mixer_swap_decks(struct move_mixer *mix)
 	mix->crossfader = 1.0f - mix->crossfader;
 }
 
-void move_mixer_set_phase_offset(struct move_mixer *mix, float offset)
-{
-	mix->phase_offset_b = fmodf(offset, 1.0f);
-	if (mix->phase_offset_b < 0.0f)
-		mix->phase_offset_b += 1.0f;
-}
-
 /*
  * Move manipulation
  */
 void move_clear(struct move *m)
 {
 	memset(m, 0, sizeof(*m));
-	/* Set bias to 0.5 (neutral) for all DOFs */
-	for (int i = 0; i < MOVE_NUM_DOFS; i++)
-		m->dof[i].bias = 0.5f;
+	/* bias = 0.0 is neutral, no loop needed after memset */
 }
 
 void move_copy(struct move *dst, const struct move *src)
@@ -243,17 +214,14 @@ void move_randomize(struct move *m, float intensity)
 		for (int h = 0; h < MOVE_NUM_HARMONICS; h++) {
 			m->dof[d].h[h].amplitude =
 				intensity * (float)rand() / (float)RAND_MAX;
-			m->dof[d].h[h].phase =
-				(float)rand() / (float)RAND_MAX;
+			m->dof[d].h[h].phase = (float)rand() / (float)RAND_MAX;
 		}
-		m->dof[d].bias = 0.5f; /* Keep bias neutral */
+		/* bias stays 0.0 (neutral) from randomize */
 	}
 }
 
-void move_interpolate(struct move *dst,
-		      const struct move *a,
-		      const struct move *b,
-		      float t)
+void move_interpolate(struct move *dst, const struct move *a,
+		      const struct move *b, float t)
 {
 	float inv_t = 1.0f - t;
 
@@ -262,12 +230,10 @@ void move_interpolate(struct move *dst,
 			dst->dof[d].h[h].amplitude =
 				inv_t * a->dof[d].h[h].amplitude +
 				t * b->dof[d].h[h].amplitude;
-			dst->dof[d].h[h].phase =
-				inv_t * a->dof[d].h[h].phase +
-				t * b->dof[d].h[h].phase;
+			dst->dof[d].h[h].phase = inv_t * a->dof[d].h[h].phase +
+						 t * b->dof[d].h[h].phase;
 		}
-		dst->dof[d].bias =
-			inv_t * a->dof[d].bias + t * b->dof[d].bias;
+		dst->dof[d].bias = inv_t * a->dof[d].bias + t * b->dof[d].bias;
 	}
 }
 
@@ -347,71 +313,59 @@ void move_lib_init(void)
 
 	/* Move 1: Simple nod (rx at 1 beat) */
 	strncpy(move_lib[1].name, "nod", MOVE_NAME_LEN - 1);
-	move_lib[1].rx.h[0].amplitude = 0.6f;
-	move_lib[1].rx.h[0].phase = 0.0f;
+	move_lib[1].dof[DOF_RX].h[0].amplitude = 0.6f;
 	move_lib[1].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
 
 	/* Move 2: Side tilt (ry at 1 beat) */
 	strncpy(move_lib[2].name, "tilt", MOVE_NAME_LEN - 1);
-	move_lib[2].ry.h[0].amplitude = 0.5f;
-	move_lib[2].ry.h[0].phase = 0.0f;
+	move_lib[2].dof[DOF_RY].h[0].amplitude = 0.5f;
 	move_lib[2].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
 
 	/* Move 3: Twist (rz at 1/2 beat) */
 	strncpy(move_lib[3].name, "twist", MOVE_NAME_LEN - 1);
-	move_lib[3].rz.h[1].amplitude = 0.4f;
-	move_lib[3].rz.h[1].phase = 0.0f;
+	move_lib[3].dof[DOF_RZ].h[1].amplitude = 0.4f;
 	move_lib[3].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
 
 	/* Move 4: Bounce (ty at 1 beat) */
 	strncpy(move_lib[4].name, "bounce", MOVE_NAME_LEN - 1);
-	move_lib[4].ty.h[0].amplitude = 0.7f;
-	move_lib[4].ty.h[0].phase = 0.0f;
+	move_lib[4].dof[DOF_TY].h[0].amplitude = 0.7f;
 	move_lib[4].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
 
 	/* Move 5: Sway (tx at 1 beat) */
 	strncpy(move_lib[5].name, "sway", MOVE_NAME_LEN - 1);
-	move_lib[5].tx.h[0].amplitude = 0.5f;
-	move_lib[5].tx.h[0].phase = 0.0f;
+	move_lib[5].dof[DOF_TX].h[0].amplitude = 0.5f;
 	move_lib[5].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
 
-	/* Move 6: Circle (tx + tz, 90° phase diff) */
+	/* Move 6: Circle (tx + tz, 90 deg phase diff) */
 	strncpy(move_lib[6].name, "circle", MOVE_NAME_LEN - 1);
-	move_lib[6].tx.h[0].amplitude = 0.5f;
-	move_lib[6].tx.h[0].phase = 0.0f;
-	move_lib[6].tz.h[0].amplitude = 0.5f;
-	move_lib[6].tz.h[0].phase = 0.25f;  /* 90° offset */
+	move_lib[6].dof[DOF_TX].h[0].amplitude = 0.5f;
+	move_lib[6].dof[DOF_TZ].h[0].amplitude = 0.5f;
+	move_lib[6].dof[DOF_TZ].h[0].phase = 0.25f;
 	move_lib[6].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
 
 	/* Move 7: Complex (multi-harmonic) */
 	strncpy(move_lib[7].name, "complex", MOVE_NAME_LEN - 1);
-	move_lib[7].rx.h[0].amplitude = 0.4f;
-	move_lib[7].rx.h[0].phase = 0.0f;
-	move_lib[7].ry.h[1].amplitude = 0.3f;
-	move_lib[7].ry.h[1].phase = 0.25f;
-	move_lib[7].ty.h[0].amplitude = 0.5f;
-	move_lib[7].ty.h[0].phase = 0.0f;
-	move_lib[7].ty.h[2].amplitude = 0.2f;
-	move_lib[7].ty.h[2].phase = 0.5f;
+	move_lib[7].dof[DOF_RX].h[0].amplitude = 0.4f;
+	move_lib[7].dof[DOF_RY].h[1].amplitude = 0.3f;
+	move_lib[7].dof[DOF_RY].h[1].phase = 0.25f;
+	move_lib[7].dof[DOF_TY].h[0].amplitude = 0.5f;
+	move_lib[7].dof[DOF_TY].h[2].amplitude = 0.2f;
+	move_lib[7].dof[DOF_TY].h[2].phase = 0.5f;
 	move_lib[7].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
 
 	/* Move 8: Wave (all rotations, staggered phase) */
 	strncpy(move_lib[8].name, "wave", MOVE_NAME_LEN - 1);
-	move_lib[8].rx.h[0].amplitude = 0.4f;
-	move_lib[8].rx.h[0].phase = 0.0f;
-	move_lib[8].ry.h[0].amplitude = 0.4f;
-	move_lib[8].ry.h[0].phase = 0.33f;
-	move_lib[8].rz.h[0].amplitude = 0.3f;
-	move_lib[8].rz.h[0].phase = 0.66f;
+	move_lib[8].dof[DOF_RX].h[0].amplitude = 0.4f;
+	move_lib[8].dof[DOF_RY].h[0].amplitude = 0.4f;
+	move_lib[8].dof[DOF_RY].h[0].phase = 0.33f;
+	move_lib[8].dof[DOF_RZ].h[0].amplitude = 0.3f;
+	move_lib[8].dof[DOF_RZ].h[0].phase = 0.66f;
 	move_lib[8].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
 
 	/* Move 9: Pulse (ty with all harmonics) */
 	strncpy(move_lib[9].name, "pulse", MOVE_NAME_LEN - 1);
-	move_lib[9].ty.h[0].amplitude = 0.5f;
-	move_lib[9].ty.h[0].phase = 0.0f;
-	move_lib[9].ty.h[1].amplitude = 0.25f;
-	move_lib[9].ty.h[1].phase = 0.0f;
-	move_lib[9].ty.h[2].amplitude = 0.125f;
-	move_lib[9].ty.h[2].phase = 0.0f;
+	move_lib[9].dof[DOF_TY].h[0].amplitude = 0.5f;
+	move_lib[9].dof[DOF_TY].h[1].amplitude = 0.25f;
+	move_lib[9].dof[DOF_TY].h[2].amplitude = 0.125f;
 	move_lib[9].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
 }

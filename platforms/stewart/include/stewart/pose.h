@@ -22,7 +22,8 @@ struct stewart_geometry;
  *   Y+ = Opp (grønn akse)
  *   Z+ = Ut av skjermen (blå akse)
  *
- * @note En pose er uavhengig av platformens home posisjon
+ * @note ty er absolutt høyde fra origo (ikke relativ til home)
+ * Dette gjelder bruk innen IK/RK, men ikke for bruk innen move_lib
  */
 struct stewart_pose {
 	float rx;
