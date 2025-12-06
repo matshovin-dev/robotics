@@ -5,6 +5,7 @@
 #include "stewart/geometry.h"
 #include "stewart/kinematics.h"
 #include "stewart/pose.h"
+#include "viz_debug.h"
 #include "viz_protocol.h"
 #include "udp.h"
 #include <GLFW/glfw3.h>
@@ -92,7 +93,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
 		camera_elevation = 30.0f;
 		ortho_scale = 400.0f;
 		camera_center_y = 100.0f;
-		printf("Camera reset\n");
+		viz_printf("Camera reset\n");
 		break;
 	case GLFW_KEY_ESCAPE:
 		glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -238,14 +239,14 @@ static void compute_kinematics(void)
 	}
 
 	if (changed) {
-		printf("Motors: ");
+		viz_printf("Motors: ");
 		for (int i = 0; i < 6; i++) {
-			printf("[%d]=%.1f° ", i,
-			       inverse_result.motor_angles_deg[i]);
+			viz_printf("[%d]=%.1f° ", i,
+				   inverse_result.motor_angles_deg[i]);
 		}
 		if (has_error)
-			printf(" ⚠️  ERROR: Pose unreachable!");
-		printf("\n");
+			viz_printf(" ERROR: Pose unreachable!");
+		viz_printf("\n");
 	}
 }
 
@@ -290,8 +291,8 @@ int main(int argc, char *argv[])
 	if (argc > 1)
 		port = atoi(argv[1]);
 
-	printf("Stewart Platform Visualizer (with kinematics)\n");
-	printf("=============================================\n\n");
+	viz_printf("Stewart Platform Visualizer (with kinematics)\n");
+	viz_printf("=============================================\n\n");
 
 	/* Initialiser geometry til MX64 (default) */
 	geometry = ROBOT_AX18; /* er bare et utgangspunkt */
@@ -312,7 +313,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	printf("Listening on UDP port %d...\n\n", port);
+	viz_printf("Listening on UDP port %d...\n\n", port);
 
 	/* Initialiser GLFW */
 	if (!glfwInit()) {
@@ -338,13 +339,13 @@ int main(int argc, char *argv[])
 	glEnable(GL_DEPTH_TEST);
 	glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
 
-	printf("Window created. Listening for UDP packets...\n");
-	printf("Camera controls:\n");
-	printf("  Arrow keys: Rotate camera\n");
-	printf("  Q/W: Zoom in/out\n");
-	printf("  A/S: Lower/raise platform relative to camera\n");
-	printf("  R: Reset camera\n");
-	printf("  ESC: Exit\n\n");
+	viz_printf("Window created. Listening for UDP packets...\n");
+	viz_printf("Camera controls:\n");
+	viz_printf("  Arrow keys: Rotate camera\n");
+	viz_printf("  Q/W: Zoom in/out\n");
+	viz_printf("  A/S: Lower/raise platform relative to camera\n");
+	viz_printf("  R: Reset camera\n");
+	viz_printf("  ESC: Exit\n\n");
 
 	/* Main loop */
 	while (!glfwWindowShouldClose(window)) {

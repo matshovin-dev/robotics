@@ -53,4 +53,7 @@ clean:
 run: plot_status
 	./plot_status
 
-.PHONY: all clean run
+quiet: CFLAGS += -DVIZ_QUIET
+quiet: clean all
+
+.PHONY: all clean run quiet

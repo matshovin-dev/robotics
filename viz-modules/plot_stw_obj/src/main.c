@@ -5,6 +5,7 @@
 #include "stewart/geometry.h"
 #include "stewart/kinematics.h"
 #include "stewart/pose.h"
+#include "viz_debug.h"
 #include "viz_protocol.h"
 #include "udp.h"
 #include "obj_loader.h"
@@ -78,7 +79,7 @@ static int load_models(enum stewart_robot_type robot_type)
 	if (model_legLong)
 		obj_free(model_legLong);
 
-	printf("Loading OBJ models for %s...\n", folder);
+	viz_printf("Loading OBJ models for %s...\n", folder);
 
 	/* Load bunn (base) */
 	snprintf(path, sizeof(path),
@@ -125,7 +126,7 @@ static int load_models(enum stewart_robot_type robot_type)
 		return -1;
 	}
 
-	printf("All models loaded successfully.\n");
+	viz_printf("All models loaded successfully.\n");
 	return 0;
 }
 
@@ -199,7 +200,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action,
 		camera_elevation = 30.0f;
 		ortho_scale = 200.0f;
 		camera_center_y = 100.0f;
-		printf("Camera reset\n");
+		viz_printf("Camera reset\n");
 		break;
 	case GLFW_KEY_ESCAPE:
 		glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -425,14 +426,14 @@ static void compute_kinematics(void)
 	}
 
 	if (changed) {
-		printf("Motors: ");
+		viz_printf("Motors: ");
 		for (int i = 0; i < 6; i++) {
-			printf("[%d]=%.1f ", i,
-			       inverse_result.motor_angles_deg[i]);
+			viz_printf("[%d]=%.1f ", i,
+				   inverse_result.motor_angles_deg[i]);
 		}
 		if (has_error)
-			printf(" ERROR: Pose unreachable!");
-		printf("\n");
+			viz_printf(" ERROR: Pose unreachable!");
+		viz_printf("\n");
 	}
 }
 
@@ -460,12 +461,12 @@ static void poll_udp(void)
 				if (packet.robot_type == ROBOT_TYPE_MX64) {
 					geometry = ROBOT_MX64;
 					load_models(ROBOT_TYPE_MX64);
-					printf("Switched to MX64 models\n");
+					viz_printf("Switched to MX64 models\n");
 				} else if (packet.robot_type ==
 					   ROBOT_TYPE_AX18) {
 					geometry = ROBOT_AX18;
 					load_models(ROBOT_TYPE_AX18);
-					printf("Switched to AX18 models\n");
+					viz_printf("Switched to AX18 models\n");
 				}
 			}
 
@@ -484,8 +485,8 @@ int main(int argc, char *argv[])
 	if (argc > 1)
 		port = atoi(argv[1]);
 
-	printf("Stewart Platform OBJ Visualizer\n");
-	printf("================================\n\n");
+	viz_printf("Stewart Platform OBJ Visualizer\n");
+	viz_printf("================================\n\n");
 
 	/* Initialize geometry to MX64 (default) */
 	geometry = ROBOT_MX64;
@@ -512,7 +513,7 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	printf("Listening on UDP port %d...\n\n", port);
+	viz_printf("Listening on UDP port %d...\n\n", port);
 
 	/* Initialize GLFW */
 	if (!glfwInit()) {
@@ -540,13 +541,13 @@ int main(int argc, char *argv[])
 	glClearColor(0.05f, 0.05f, 0.1f, 1.0f);
 	setup_lighting();
 
-	printf("Window created. Listening for UDP packets...\n");
-	printf("Camera controls:\n");
-	printf("  Arrow keys: Rotate camera\n");
-	printf("  Q/W: Zoom in/out\n");
-	printf("  A/S: Lower/raise focus point\n");
-	printf("  R: Reset camera\n");
-	printf("  ESC: Exit\n\n");
+	viz_printf("Window created. Listening for UDP packets...\n");
+	viz_printf("Camera controls:\n");
+	viz_printf("  Arrow keys: Rotate camera\n");
+	viz_printf("  Q/W: Zoom in/out\n");
+	viz_printf("  A/S: Lower/raise focus point\n");
+	viz_printf("  R: Reset camera\n");
+	viz_printf("  ESC: Exit\n\n");
 
 	/* Main loop */
 	while (!glfwWindowShouldClose(window)) {

@@ -8,6 +8,7 @@
 
 #include "text_renderer.h"
 #include "udp.h"
+#include "viz_debug.h"
 #include "viz_status.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
@@ -148,8 +149,8 @@ int main(void)
 {
 	GLFWwindow *window;
 
-	printf("Status Display\n");
-	printf("==============\n\n");
+	viz_printf("Status Display\n");
+	viz_printf("==============\n\n");
 
 	/* Create UDP receiver */
 	udp_sock = udp_create_receiver(VIZ_STATUS_PORT);
@@ -158,7 +159,7 @@ int main(void)
 			VIZ_STATUS_PORT);
 		return 1;
 	}
-	printf("Listening on UDP port %d...\n\n", VIZ_STATUS_PORT);
+	viz_printf("Listening on UDP port %d...\n\n", VIZ_STATUS_PORT);
 
 	/* Initialize GLFW */
 	if (!glfwInit()) {
@@ -194,7 +195,7 @@ int main(void)
 	/* Setup OpenGL */
 	glClearColor(0.1f, 0.1f, 0.12f, 1.0f);
 
-	printf("Press ESC to exit\n\n");
+	viz_printf("Press ESC to exit\n\n");
 
 	/* Main loop */
 	while (!glfwWindowShouldClose(window)) {

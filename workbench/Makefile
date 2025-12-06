@@ -1,14 +1,23 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -O2 \
 	-I ../libs/move_lib/include \
+	-I ../libs/input/include \
 	-I ../libs/math/include \
 	-I ../platforms/stewart/include \
 	-I ../viz-modules/common/include
 
 LDFLAGS = -lm
 
+# Check for macOS (CoreMIDI)
+UNAME := $(shell uname)
+ifeq ($(UNAME), Darwin)
+    LDFLAGS += -framework CoreMIDI -framework CoreFoundation
+    INPUT_MIDI = ../libs/input/build/input_midi.o
+endif
+
 # Object files from other libraries
 MOVE_LIB = ../libs/move_lib/build/move_lib.o
+INPUT_LIB = ../libs/input/build/input_keyboard.o $(INPUT_MIDI)
 STEWART_GEOM = ../platforms/stewart/build/geometry.o
 VIZ_COMMON = ../viz-modules/common/src/viz_sender.c \
              ../viz-modules/common/src/viz_status.c \
@@ -18,10 +27,11 @@ DEPS = $(MOVE_LIB) $(STEWART_GEOM)
 
 .PHONY: all clean deps
 
-all: deps wb_move_test wb_mixer_test
+all: deps wb_move_test wb_mixer_test wb_input_test
 
 deps:
 	$(MAKE) -C ../libs/move_lib
+	$(MAKE) -C ../libs/input
 	$(MAKE) -C ../platforms/stewart
 
 wb_move_test: wb_move_test.c $(DEPS)
@@ -30,5 +40,8 @@ wb_move_test: wb_move_test.c $(DEPS)
 wb_mixer_test: wb_mixer_test.c $(DEPS)
 	$(CC) $(CFLAGS) $< $(DEPS) $(VIZ_COMMON) -o $@ $(LDFLAGS)
 
+wb_input_test: wb_input_test.c $(DEPS) $(INPUT_LIB)
+	$(CC) $(CFLAGS) $< $(DEPS) $(INPUT_LIB) $(VIZ_COMMON) -o $@ $(LDFLAGS)
+
 clean:
-	rm -f wb_move_test wb_mixer_test
+	rm -f wb_move_test wb_mixer_test wb_input_test

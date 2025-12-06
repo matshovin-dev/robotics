@@ -94,4 +94,7 @@ run: plot_stw_obj
 test: test_animation
 	./test_animation
 
-.PHONY: all clean run test
+quiet: CFLAGS += -DVIZ_QUIET
+quiet: clean all
+
+.PHONY: all clean run test quiet

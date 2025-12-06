@@ -1,0 +1,39 @@
+
+
+fader 0, volume deck A
+channel 1 
+note 70
+verdi 0-127
+
+fader 1, volume deck B
+channel 1 
+note 71
+verdi 0-127
+
+fader 2, Crossfade deck A/B
+channel 1 
+note 72
+verdi 0-127
+
+encoder 0, bpm
+channel 1 
+note 80
+verdi 1/65 (relativ)
+
+encoder 1, phase
+channel 1 
+note 81
+verdi 1/65 (relativ), fint med float step på 0.1 radian
+
+encoder 2, next move for B
+channel 1 
+note 81
+verdi 1/65 (relativ), fint med float step på 0.1 radian
+
+button 0, kopier move 0 til move 99
+channel 1 
+note 8
+verdi 0/127, toggle 
+
+
+
