@@ -20,6 +20,8 @@
  *   Q/Esc   Quit
  */
 
+#include "song_player.h"
+#include "song_lib.h"
 #include "input.h"
 #include "move_lib.h"
 #include "stewart/geometry.h"
@@ -118,6 +120,53 @@ static int handle_event(struct input_event *ev)
 		}
 		break;
 
+	/* Play first song from library, sync with move */
+	case INPUT_ID_PLAY_SONG: {
+		struct song *s = song_lib_get(0);
+		if (s) {
+			/* Load and play song from start */
+			song_player_load(s->wav_path);
+			song_player_rewind();
+			song_player_play();
+
+			/* Sync move playback with phase offset */
+			move_playback.bpm = s->bpm;
+			move_playback.t = 0.0f;
+			move_playback.master_phase = s->master_phase;
+
+			printf("\n  [PLAY] %s @ %.0f BPM, phase=%.2f\n",
+			       s->name, s->bpm, s->master_phase);
+			fflush(stdout);
+		} else {
+			printf("\n  [PLAY] No songs in library\n");
+			fflush(stdout);
+		}
+		break;
+	}
+
+	/* Save current bpm/phase to song library */
+	case INPUT_ID_SAVE_SONG: {
+		struct song *s = song_lib_get(0);
+		if (s) {
+			/* Update song with current values */
+			s->bpm = move_playback.bpm;
+			s->master_phase = move_playback.master_phase;
+
+			/* Save to file */
+			if (song_lib_save("/Users/matsmac/vsCode/robotics/assets/songs/song_lib.json") == 0) {
+				printf("\n  [SAVE] %s: BPM=%.0f, phase=%.2f\n",
+				       s->name, s->bpm, s->master_phase);
+			} else {
+				printf("\n  [SAVE] Error saving library\n");
+			}
+			fflush(stdout);
+		} else {
+			printf("\n  [SAVE] No songs in library\n");
+			fflush(stdout);
+		}
+		break;
+	}
+
 	/* Move presets 0-9 -> load to deck B */
 	case INPUT_ID_MOVE_0:
 	case INPUT_ID_MOVE_1:
@@ -147,6 +196,14 @@ int main(void)
 	struct viz_status status;
 	struct input_event ev;
 	int running = 1;
+	song_lib_load(
+		"/Users/matsmac/vsCode/robotics/assets/songs/song_lib.json");
+
+	/* Initialize song player */
+	if (song_player_init() < 0) {
+		fprintf(stderr, "Failed to initialize song player\n");
+		return 1;
+	}
 
 	/* Initialize keyboard input */
 	if (input_keyboard_init() < 0) {
@@ -290,6 +347,7 @@ int main(void)
 
 	printf("\n\nGoodbye!\n");
 
+	song_player_cleanup();
 	input_keyboard_cleanup();
 	input_midi_cleanup();
 	viz_status_close(&status);

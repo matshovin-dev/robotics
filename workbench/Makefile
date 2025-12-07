@@ -3,15 +3,16 @@ CFLAGS = -Wall -Wextra -std=c11 -O2 \
 	-I ../libs/move_lib/include \
 	-I ../libs/input/include \
 	-I ../libs/math/include \
+	-I ../libs/song_lib/include \
 	-I ../platforms/stewart/include \
 	-I ../viz-modules/common/include
 
 LDFLAGS = -lm
 
-# Check for macOS (CoreMIDI)
+# Check for macOS (CoreMIDI + AudioToolbox)
 UNAME := $(shell uname)
 ifeq ($(UNAME), Darwin)
-    LDFLAGS += -framework CoreMIDI -framework CoreFoundation
+    LDFLAGS += -framework CoreMIDI -framework CoreFoundation -framework AudioToolbox
     INPUT_MIDI = ../libs/input/build/input_midi.o
 endif
 
@@ -20,11 +21,14 @@ MOVE_LIB = ../libs/move_lib/build/move_lib.o
 INPUT_LIB = ../libs/input/build/input_keyboard.o $(INPUT_MIDI)
 STEWART_GEOM = ../platforms/stewart/build/geometry.o
 MATH_UTILS = ../libs/math/build/utils.o
+SONG_LIB = ../libs/song_lib/build/song_lib.o \
+           ../libs/song_lib/build/song_player.o \
+           ../libs/song_lib/build/cJSON.o
 VIZ_COMMON = ../viz-modules/common/src/viz_sender.c \
              ../viz-modules/common/src/viz_status.c \
              ../viz-modules/common/src/udp.c
 
-DEPS = $(MOVE_LIB) $(STEWART_GEOM) $(MATH_UTILS)
+DEPS = $(MOVE_LIB) $(STEWART_GEOM) $(MATH_UTILS) $(SONG_LIB)
 
 .PHONY: all clean deps
 
@@ -34,6 +38,7 @@ deps:
 	$(MAKE) -C ../libs/math
 	$(MAKE) -C ../libs/move_lib
 	$(MAKE) -C ../libs/input
+	$(MAKE) -C ../libs/song_lib
 	$(MAKE) -C ../platforms/stewart
 
 wb_move_test: wb_move_test.c $(DEPS)

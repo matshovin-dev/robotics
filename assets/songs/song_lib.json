@@ -1,0 +1,8 @@
+{
+	"songs":	[{
+			"name":	"MariaC",
+			"wav_path":	"/Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav",
+			"bpm":	150,
+			"master_phase":	-2.27999997138977
+		}]
+}

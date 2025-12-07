@@ -10,16 +10,16 @@
  * @name: Display name / title
  * @wav_path: Path to wav file
  * @bpm: Beats per minute (constant for song)
- * @music_downbeat_offset: Seconds into song where first downbeat occurs
+ * @master_phase: Phase offset to align move_downbeat with music_downbeat
  *
- * music_downbeat is the first strong beat in the song.
- * Used to align with move_downbeat (h[0] minimum at master_phase = 3π/2).
+ * master_phase shifts the move so that move_downbeat (h[0] minimum at 3π/2)
+ * aligns with the music's downbeat when song starts from 0.
  */
 struct song {
 	char name[SONG_NAME_MAX];
 	char wav_path[SONG_PATH_MAX];
 	float bpm;
-	float music_downbeat_offset;
+	float master_phase;
 };
 
 /* Global song library */
@@ -37,12 +37,12 @@ void song_lib_init(void);
  * @name: Display name
  * @wav_path: Path to wav file
  * @bpm: Beats per minute
- * @music_downbeat_offset: Seconds to first downbeat
+ * @master_phase: Phase offset for move synchronization
  *
  * Returns index of added song, or -1 if library is full.
  */
 int song_lib_add(const char *name, const char *wav_path, float bpm,
-		 float music_downbeat_offset);
+		 float master_phase);
 
 /**
  * song_lib_get - Get song by index

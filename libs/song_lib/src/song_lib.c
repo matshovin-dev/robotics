@@ -15,7 +15,7 @@ void song_lib_init(void)
 }
 
 int song_lib_add(const char *name, const char *wav_path, float bpm,
-		 float music_downbeat_offset)
+		 float master_phase)
 {
 	if (song_lib_count >= SONG_LIB_SIZE)
 		return -1;
@@ -29,7 +29,7 @@ int song_lib_add(const char *name, const char *wav_path, float bpm,
 	s->wav_path[SONG_PATH_MAX - 1] = '\0';
 
 	s->bpm = bpm;
-	s->music_downbeat_offset = music_downbeat_offset;
+	s->master_phase = master_phase;
 
 	return song_lib_count++;
 }
@@ -60,8 +60,8 @@ int song_lib_save(const char *path)
 		cJSON_AddStringToObject(song, "name", song_lib[i].name);
 		cJSON_AddStringToObject(song, "wav_path", song_lib[i].wav_path);
 		cJSON_AddNumberToObject(song, "bpm", song_lib[i].bpm);
-		cJSON_AddNumberToObject(song, "music_downbeat_offset",
-					song_lib[i].music_downbeat_offset);
+		cJSON_AddNumberToObject(song, "master_phase",
+					song_lib[i].master_phase);
 		cJSON_AddItemToArray(songs, song);
 	}
 
@@ -125,13 +125,13 @@ int song_lib_load(const char *path)
 		cJSON *name = cJSON_GetObjectItem(song, "name");
 		cJSON *wav_path = cJSON_GetObjectItem(song, "wav_path");
 		cJSON *bpm = cJSON_GetObjectItem(song, "bpm");
-		cJSON *offset = cJSON_GetObjectItem(song, "music_downbeat_offset");
+		cJSON *phase = cJSON_GetObjectItem(song, "master_phase");
 
 		if (cJSON_IsString(name) && cJSON_IsString(wav_path) &&
-		    cJSON_IsNumber(bpm) && cJSON_IsNumber(offset)) {
+		    cJSON_IsNumber(bpm) && cJSON_IsNumber(phase)) {
 			song_lib_add(name->valuestring, wav_path->valuestring,
 				     (float)bpm->valuedouble,
-				     (float)offset->valuedouble);
+				     (float)phase->valuedouble);
 		}
 	}
 
