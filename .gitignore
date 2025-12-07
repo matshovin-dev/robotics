@@ -25,6 +25,11 @@ build/
 dist/
 bin/
 
+# Other
+*.wav
+*.mp3
+*.mp4
+
 # Temporary files
 *.tmp
 *.swp
@@ -41,3 +46,11 @@ __pycache__/
 html/
 latex/
 docs/generated/
+
+# SolidWorks files (large source files, backup separately)
+assets/3d_models/solidworks/
+*.SLDPRT
+*.SLDASM
+*.SLDDRW
+*.SLDPRT~
+*.SLDASM~

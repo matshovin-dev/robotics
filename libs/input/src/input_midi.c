@@ -28,6 +28,7 @@
 #define MIDI_NOTE_PHASE       81
 #define MIDI_NOTE_MOVE_SEL    82
 #define MIDI_NOTE_COPY        8
+#define MIDI_NOTE_AUTOFADE    16
 
 /* Encoder step sizes */
 #define PHASE_STEP    0.1f    /* radians */
@@ -187,6 +188,13 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 						if (value > 0) {  /* button press */
 							ev.type = INPUT_BUTTON;
 							ev.id = INPUT_ID_COPY;
+							ev.value = 1.0f;
+						}
+						break;
+					case MIDI_NOTE_AUTOFADE:
+						if (value > 0) {  /* button press */
+							ev.type = INPUT_BUTTON;
+							ev.id = INPUT_ID_AUTOFADE;
 							ev.value = 1.0f;
 						}
 						break;

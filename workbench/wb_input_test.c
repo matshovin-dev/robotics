@@ -32,6 +32,20 @@
 #include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <math.h>
+
+/* Auto-fade state machine */
+#define AUTOFADE_IDLE 0
+#define AUTOFADE_WAITING 1
+#define AUTOFADE_FADING 2
+
+static int autofade_state = AUTOFADE_IDLE;
+static float autofade_start_t; /* time when fading starts */
+static float autofade_duration_sec; /* fade duration in seconds */
+static float autofade_progress; /* 0.0 to 1.0 */
+
+/* Target phase for auto-fade start: 3π/2 (minimum of sine) */
+#define AUTOFADE_TARGET_PHASE (3.0f * M_PI / 2.0f)
 
 /* Print current status */
 static void print_status(void)
@@ -89,6 +103,19 @@ static int handle_event(struct input_event *ev)
 	case INPUT_ID_COPY:
 		move_copy(&move_lib[0], &move_lib[move_mixer.deck_b]);
 		printf("\n  [COPY] move %d -> move 0\n", move_mixer.deck_b);
+		break;
+
+	/* Auto-fade: wait for phase, fade over 3 periods, copy, reset */
+	case INPUT_ID_AUTOFADE:
+		if (autofade_state == AUTOFADE_IDLE) {
+			autofade_state = AUTOFADE_WAITING;
+			/* 3 periods at current BPM: period = 60/bpm seconds */
+			autofade_duration_sec =
+				3.0f * (60.0f / move_playback.bpm);
+			printf("\n  [AUTOFADE] Waiting for phase 3π/2... (%.1fs fade)\n",
+			       autofade_duration_sec);
+			fflush(stdout);
+		}
 		break;
 
 	/* Move presets 0-9 -> load to deck B */
@@ -189,6 +216,53 @@ int main(void)
 		last = now;
 
 		move_playback_tick(&move_playback, dt);
+
+		/* Auto-fade state machine */
+		if (autofade_state == AUTOFADE_WAITING) {
+			/* Get current phase from playback (already [0, 2π]) */
+			float phase_norm = move_phase_1(&move_playback);
+
+			/* Check if we crossed target phase (3π/2 ≈ 4.71) */
+			float target = (float)AUTOFADE_TARGET_PHASE;
+			static float last_phase = 0.0f;
+			int crossed =
+				(last_phase < target && phase_norm >= target) ||
+				(last_phase > 5.0f && phase_norm < 1.0f &&
+				 target > 4.0f);
+
+			last_phase = phase_norm;
+
+			if (crossed) {
+				autofade_state = AUTOFADE_FADING;
+				autofade_start_t = move_playback.t;
+				autofade_progress = 0.0f;
+				printf("\n  [AUTOFADE] Fading started!\n");
+			}
+		} else if (autofade_state == AUTOFADE_FADING) {
+			/* Calculate progress based on time elapsed */
+			float time_elapsed = move_playback.t - autofade_start_t;
+			autofade_progress =
+				time_elapsed / autofade_duration_sec;
+
+			if (autofade_progress >= 1.0f) {
+				/* Fade complete: copy and reset */
+				autofade_progress = 1.0f;
+				move_mixer.crossfader = 1.0f;
+
+				move_copy(&move_lib[0],
+					  &move_lib[move_mixer.deck_b]);
+				printf("\n  [AUTOFADE] Complete! move %d -> move 0\n",
+				       move_mixer.deck_b);
+
+				/* Reset crossfader and state */
+				move_mixer.crossfader = 0.0f;
+				autofade_state = AUTOFADE_IDLE;
+			} else {
+				/* Linear fade */
+				move_mixer.crossfader = autofade_progress;
+			}
+			print_status();
+		}
 
 		/* Mixed output (robot) -> port 9010 */
 		move_evaluate_mixed(&move_mixer, &move_playback, geom_64,

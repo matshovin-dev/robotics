@@ -33,6 +33,7 @@
 #define INPUT_ID_VOLUME_A   3   /* Volume/intensity deck A - live (fader 0-1) */
 #define INPUT_ID_VOLUME_B   4   /* Volume/intensity deck B - preview (fader 0-1) */
 #define INPUT_ID_COPY       5   /* Copy move 0 -> move 99 (button) */
+#define INPUT_ID_AUTOFADE   6   /* Auto-fade: wait for phase, fade, copy, reset */
 #define INPUT_ID_MOVE_0     10  /* Move presets 0-9 -> load to deck B */
 #define INPUT_ID_MOVE_1     11
 #define INPUT_ID_MOVE_2     12

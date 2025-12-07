@@ -52,3 +52,15 @@ x4
 
 Vol A | Vol B | Fade |
 
+
+--------------------------------------------
+
+  move_downbeat = maks utslag i negativ retning for DOF-en h[0] påvirker, når h[0].phase = 0.
+  Skjer ved master_phase = 3π/2.
+
+  Senere kan du ha:
+
+  music_downbeat = første sterke slag i takten (fra låt-analyse eller manuell markering)
+
+  Og synkronisering blir da å justere master_phase slik at move_downbeat treffer music_downbeat.
+
