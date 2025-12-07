@@ -1,0 +1,54 @@
+tree ~/vscode/robotics -C -I 'html|latex|*.o|*.d|.git'
+
+doxygen Doxyfile 
+
+VIS MD: shift-command-V
+
+sfc - for func komment
+k - for enkel komment
+
+------------------------------------------------------------------
+
+Term 3 - POLYGON plotter 
+/Users/matsmac/vsCode/robotics/viz-modules/plot_stw_polygon
+./plot_stw_polygon 9020
+make quiet
+viz_sender_send_pose(sock, &pose, ROBOT_TYPE_MX64, 9010);
+
+Term 4 - STATUS plotter 
+/Users/matsmac/vsCode/robotics/viz-modules/plot_status
+./plot_status (fast 9003)
+make
+viz_status_set(&status, "volumeB", move_mixer.volume_b);
+...
+viz_status_send(&status);
+
+Term 2 - OBJ plotter 2
+/Users/matsmac/vsCode/robotics/viz-modules/plot_stw_obj
+./plot_stw_obj 9011
+make quiet
+viz_sender_send_pose(sock, &pose, ROBOT_TYPE_MX64, 9011);
+
+Term 2 - OBJ plotter 1
+/Users/matsmac/vsCode/robotics/viz-modules/plot_stw_obj
+./plot_stw_obj 9010
+make quiet
+viz_sender_send_pose(sock, &pose, ROBOT_TYPE_MX64, 9010);
+
+
+Term 1 - workbench
+cd /Users/matsmac/vsCode/robotics/workbench
+./wb_input_test 
+make wb_input_test 
+
+------------------------------------------------------------------
+
+BPM   | Next  |
+
+x1
+x2
+x3
+x4
+
+Vol A | Vol B | Fade |
+

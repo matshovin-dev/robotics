@@ -69,4 +69,18 @@ float clamp(float value, float min, float max, int *was_clamped);
 float soft_clamp(float value, float min, float max, float margin,
 		 int *was_clamped);
 
+/**
+ * @function clampf
+ * @api PUBLIC
+ *
+ * @input  verdi  float
+ * @input  min    float
+ * @input  max    float
+ *
+ * @output return float
+ *
+ * Vanlig generell hard float clamp, typisk for ligninger
+ */
+float clampf(float v, float min, float max);
+
 #endif /* ROBOTICS_MATH_UTILS_H */

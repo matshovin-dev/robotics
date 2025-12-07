@@ -27,20 +27,11 @@
 #include "viz_sender.h"
 #include "viz_status.h"
 #include "viz_ports.h"
+#include "robotics/math/utils.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <unistd.h>
-
-/* Clamp float to range */
-static float clampf(float v, float min, float max)
-{
-	if (v < min)
-		return min;
-	if (v > max)
-		return max;
-	return v;
-}
 
 /* Print current status */
 static void print_status(void)
@@ -74,30 +65,30 @@ static int handle_event(struct input_event *ev)
 		if (ev->type == INPUT_FADER)
 			move_mixer_set_crossfade(&move_mixer, ev->value);
 		else
-			move_mixer_set_crossfade(&move_mixer,
-						 move_mixer.crossfader + ev->value);
+			move_mixer_set_crossfade(
+				&move_mixer, move_mixer.crossfader + ev->value);
 		break;
 
 	case INPUT_ID_VOLUME_A:
 		if (ev->type == INPUT_FADER)
 			move_mixer.volume_a = ev->value;
 		else
-			move_mixer.volume_a =
-				clampf(move_mixer.volume_a + ev->value, 0.0f, 1.0f);
+			move_mixer.volume_a = clampf(
+				move_mixer.volume_a + ev->value, 0.0f, 1.0f);
 		break;
 
 	case INPUT_ID_VOLUME_B:
 		if (ev->type == INPUT_FADER)
 			move_mixer.volume_b = ev->value;
 		else
-			move_mixer.volume_b =
-				clampf(move_mixer.volume_b + ev->value, 0.0f, 1.0f);
+			move_mixer.volume_b = clampf(
+				move_mixer.volume_b + ev->value, 0.0f, 1.0f);
 		break;
 
-	/* Copy move 0 -> move 99 (backup) */
+	/* Copy deck B -> move 0 (commit preview to live) */
 	case INPUT_ID_COPY:
-		move_copy(&move_lib[99], &move_lib[0]);
-		printf("\n  [COPY] move 0 -> move 99\n");
+		move_copy(&move_lib[0], &move_lib[move_mixer.deck_b]);
+		printf("\n  [COPY] move %d -> move 0\n", move_mixer.deck_b);
 		break;
 
 	/* Move presets 0-9 -> load to deck B */
@@ -125,7 +116,7 @@ int main(void)
 	struct timeval last, now;
 	struct stewart_pose pose;
 	const struct stewart_geometry *geom_64 = &ROBOT_MX64;
-	const struct stewart_geometry *geom_18 = &ROBOT_AX18;
+	/* const struct stewart_geometry *geom_18 = &ROBOT_AX18; */
 	struct viz_status status;
 	struct input_event ev;
 	int running = 1;
@@ -146,8 +137,8 @@ int main(void)
 	move_playback.bpm = 120.0f;
 
 	/* Default mixer setup: A=idle(0), B=active move */
-	move_mixer.deck_a = 0;  /* always idle */
-	move_mixer.deck_b = 4;  /* bounce */
+	move_mixer.deck_a = 0; /* always */
+	move_mixer.deck_b = 4; /* ex. bounce */
 	move_mixer.crossfader = 0.0f;
 	move_mixer.volume_a = 1.0f;
 	move_mixer.volume_b = 1.0f;
@@ -199,25 +190,17 @@ int main(void)
 
 		move_playback_tick(&move_playback, dt);
 
-		/* Evaluate mixer */
+		/* Mixed output (robot) -> port 9010 */
 		move_evaluate_mixed(&move_mixer, &move_playback, geom_64,
 				    &pose);
-
-		/* Add home height to ty */
 		pose.ty += geom_64->home_height;
+		viz_sender_send_pose(sock, &pose, ROBOT_TYPE_MX64, 9010);
 
-		/* Send pose */
+		/* Deck B preview (ren) -> port 9011 */
+		move_evaluate(&move_lib[move_mixer.deck_b], &move_playback,
+			      geom_64, &pose);
+		pose.ty += geom_64->home_height;
 		viz_sender_send_pose(sock, &pose, ROBOT_TYPE_MX64, 9011);
-
-		/* Evaluate mixer */
-		move_evaluate_mixed(&move_mixer, &move_playback, geom_18,
-				    &pose);
-
-		/* Add home height to ty */
-		pose.ty += geom_18->home_height;
-
-		/* Send pose */
-		viz_sender_send_pose(sock, &pose, ROBOT_TYPE_AX18, 9010);
 
 		/* Send status */
 		viz_status_set(&status, "bpm", move_playback.bpm);

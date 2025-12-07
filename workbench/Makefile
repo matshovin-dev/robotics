@@ -19,17 +19,19 @@ endif
 MOVE_LIB = ../libs/move_lib/build/move_lib.o
 INPUT_LIB = ../libs/input/build/input_keyboard.o $(INPUT_MIDI)
 STEWART_GEOM = ../platforms/stewart/build/geometry.o
+MATH_UTILS = ../libs/math/build/utils.o
 VIZ_COMMON = ../viz-modules/common/src/viz_sender.c \
              ../viz-modules/common/src/viz_status.c \
              ../viz-modules/common/src/udp.c
 
-DEPS = $(MOVE_LIB) $(STEWART_GEOM)
+DEPS = $(MOVE_LIB) $(STEWART_GEOM) $(MATH_UTILS)
 
 .PHONY: all clean deps
 
 all: deps wb_move_test wb_mixer_test wb_input_test
 
 deps:
+	$(MAKE) -C ../libs/math
 	$(MAKE) -C ../libs/move_lib
 	$(MAKE) -C ../libs/input
 	$(MAKE) -C ../platforms/stewart
