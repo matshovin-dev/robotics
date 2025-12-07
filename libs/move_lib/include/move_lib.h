@@ -220,4 +220,20 @@ void move_lib_clear(int index);
 /** Initialize a range of moves with random values */
 void move_lib_randomize_range(int start, int end, float intensity);
 
+/**
+ * move_lib_save - Save move library to JSON file
+ * @path: Path to JSON file
+ *
+ * Returns 0 on success, -1 on error.
+ */
+int move_lib_save(const char *path);
+
+/**
+ * move_lib_load - Load move library from JSON file
+ * @path: Path to JSON file
+ *
+ * Returns number of moves loaded, or -1 on error.
+ */
+int move_lib_load(const char *path);
+
 #endif /* MOVE_LIB_H */

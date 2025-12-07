@@ -49,6 +49,11 @@ static float autofade_progress; /* 0.0 to 1.0 */
 /* Target phase for auto-fade start: 3π/2 (minimum of sine) */
 #define AUTOFADE_TARGET_PHASE (3.0f * M_PI / 2.0f)
 
+/* Click track state */
+static int click_enabled = 0;
+static float click_last_phase = 0.0f;
+static float click_cooldown = 0.0f;  /* seconds until next click allowed */
+
 /* Print current status */
 static void print_status(void)
 {
@@ -153,7 +158,9 @@ static int handle_event(struct input_event *ev)
 			s->master_phase = move_playback.master_phase;
 
 			/* Save to file */
-			if (song_lib_save("/Users/matsmac/vsCode/robotics/assets/songs/song_lib.json") == 0) {
+			if (song_lib_save(
+				    "/Users/matsmac/vsCode/robotics/assets/songs/song_lib.json") ==
+			    0) {
 				printf("\n  [SAVE] %s: BPM=%.0f, phase=%.2f\n",
 				       s->name, s->bpm, s->master_phase);
 			} else {
@@ -167,18 +174,18 @@ static int handle_event(struct input_event *ev)
 		break;
 	}
 
-	/* Move presets 0-9 -> load to deck B */
-	case INPUT_ID_MOVE_0:
-	case INPUT_ID_MOVE_1:
-	case INPUT_ID_MOVE_2:
-	case INPUT_ID_MOVE_3:
-	case INPUT_ID_MOVE_4:
-	case INPUT_ID_MOVE_5:
-	case INPUT_ID_MOVE_6:
-	case INPUT_ID_MOVE_7:
-	case INPUT_ID_MOVE_8:
-	case INPUT_ID_MOVE_9:
-		move_mixer_set_deck_b(&move_mixer, ev->id - INPUT_ID_MOVE_0);
+	/* Toggle click track */
+	case INPUT_ID_CLICK:
+		click_enabled = !click_enabled;
+		song_player_click_enable(click_enabled);
+		printf("\n  [CLICK] %s\n", click_enabled ? "ON" : "OFF");
+		fflush(stdout);
+		break;
+
+	/* Move presets -> load to deck B (any move 0-99) */
+	default:
+		if (ev->id >= INPUT_ID_MOVE_0 && ev->id < INPUT_ID_MOVE_0 + MOVE_LIB_SIZE)
+			move_mixer_set_deck_b(&move_mixer, ev->id - INPUT_ID_MOVE_0);
 		break;
 	}
 
@@ -218,6 +225,7 @@ int main(void)
 
 	/* Initialize move library */
 	move_lib_init();
+	move_lib_randomize_range(12, 90, 0.75);
 	move_playback.bpm = 120.0f;
 
 	/* Default mixer setup: A=idle(0), B=active move */
@@ -273,6 +281,23 @@ int main(void)
 		last = now;
 
 		move_playback_tick(&move_playback, dt);
+
+		/* Click track - trigger at 3π/2 phase */
+		if (click_enabled) {
+			click_cooldown -= dt;
+			float phase = move_phase_1(&move_playback);
+			float target = (float)AUTOFADE_TARGET_PHASE;
+
+			/* Check if we crossed target phase */
+			int crossed = (click_last_phase < target && phase >= target) ||
+				      (click_last_phase > 5.0f && phase < 1.0f);
+			click_last_phase = phase;
+
+			if (crossed && click_cooldown <= 0.0f) {
+				song_player_click_trigger();
+				click_cooldown = 0.2f;  /* 200ms cooldown */
+			}
+		}
 
 		/* Auto-fade state machine */
 		if (autofade_state == AUTOFADE_WAITING) {
@@ -330,6 +355,13 @@ int main(void)
 		/* Deck B preview (ren) -> port 9011 */
 		move_evaluate(&move_lib[move_mixer.deck_b], &move_playback,
 			      geom_64, &pose);
+		/* Apply volume B to preview */
+		pose.rx *= move_mixer.volume_b;
+		pose.ry *= move_mixer.volume_b;
+		pose.rz *= move_mixer.volume_b;
+		pose.tx *= move_mixer.volume_b;
+		pose.ty *= move_mixer.volume_b;
+		pose.tz *= move_mixer.volume_b;
 		pose.ty += geom_64->home_height;
 		viz_sender_send_pose(sock, &pose, ROBOT_TYPE_MX64, 9011);
 
@@ -338,6 +370,7 @@ int main(void)
 		viz_status_set(&status, "phase", move_playback.master_phase);
 		viz_status_set(&status, "crossfader", move_mixer.crossfader);
 		viz_status_set(&status, "deckB", move_mixer.deck_b);
+		viz_status_set_str(&status, "moveB", move_lib[move_mixer.deck_b].name);
 		viz_status_set(&status, "volumeA", move_mixer.volume_a);
 		viz_status_set(&status, "volumeB", move_mixer.volume_b);
 		viz_status_send(&status);

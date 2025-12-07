@@ -28,12 +28,26 @@ void viz_status_set(struct viz_status *st, const char *name, float value)
 	strncpy(st->pairs[st->count].name, name, VIZ_STATUS_NAME_LEN - 1);
 	st->pairs[st->count].name[VIZ_STATUS_NAME_LEN - 1] = '\0';
 	st->pairs[st->count].value = value;
+	st->pairs[st->count].is_string = 0;
 	st->count++;
 }
 
 void viz_status_set_int(struct viz_status *st, const char *name, int value)
 {
 	viz_status_set(st, name, (float)value);
+}
+
+void viz_status_set_str(struct viz_status *st, const char *name, const char *value)
+{
+	if (st->count >= VIZ_STATUS_MAX_PAIRS)
+		return;
+
+	strncpy(st->pairs[st->count].name, name, VIZ_STATUS_NAME_LEN - 1);
+	st->pairs[st->count].name[VIZ_STATUS_NAME_LEN - 1] = '\0';
+	strncpy(st->pairs[st->count].str_value, value, VIZ_STATUS_NAME_LEN - 1);
+	st->pairs[st->count].str_value[VIZ_STATUS_NAME_LEN - 1] = '\0';
+	st->pairs[st->count].is_string = 1;
+	st->count++;
 }
 
 void viz_status_send(struct viz_status *st)
@@ -46,10 +60,18 @@ void viz_status_send(struct viz_status *st)
 	int pos = 0;
 
 	for (int i = 0; i < st->count; i++) {
-		int written = snprintf(buf + pos, sizeof(buf) - pos,
-				       "%s:%.4f\n",
-				       st->pairs[i].name,
-				       st->pairs[i].value);
+		int written;
+		if (st->pairs[i].is_string) {
+			written = snprintf(buf + pos, sizeof(buf) - pos,
+					   "%s:%s\n",
+					   st->pairs[i].name,
+					   st->pairs[i].str_value);
+		} else {
+			written = snprintf(buf + pos, sizeof(buf) - pos,
+					   "%s:%.4f\n",
+					   st->pairs[i].name,
+					   st->pairs[i].value);
+		}
 		if (written > 0)
 			pos += written;
 	}

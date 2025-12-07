@@ -6,7 +6,9 @@
 #include "move_lib.h"
 #include "stewart/geometry.h"
 #include "stewart/pose.h"
+#include "../../song_lib/vendor/cJSON.h"
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -296,8 +298,10 @@ void move_lib_randomize_range(int start, int end, float intensity)
 	if (end > MOVE_LIB_SIZE)
 		end = MOVE_LIB_SIZE;
 
-	for (int i = start; i < end; i++)
+	for (int i = start; i < end; i++) {
 		move_randomize(&move_lib[i], intensity);
+		snprintf(move_lib[i].name, MOVE_NAME_LEN, "rnd%d", i);
+	}
 }
 
 /*
@@ -368,4 +372,180 @@ void move_lib_init(void)
 	move_lib[9].dof[DOF_TY].h[1].amplitude = 0.25f;
 	move_lib[9].dof[DOF_TY].h[2].amplitude = 0.125f;
 	move_lib[9].flags = MOVE_FLAG_PRESET | MOVE_FLAG_LOOPABLE;
+}
+
+/*
+ * JSON save/load
+ */
+static const char *dof_names[MOVE_NUM_DOFS] = {
+	"rx", "ry", "rz", "tx", "ty", "tz"
+};
+
+int move_lib_save(const char *path)
+{
+	cJSON *root = cJSON_CreateObject();
+	cJSON *moves = cJSON_CreateArray();
+
+	for (int i = 0; i < MOVE_LIB_SIZE; i++) {
+		/* Skip empty moves (no name and all zeros) */
+		if (move_lib[i].name[0] == '\0' && move_lib[i].flags == 0)
+			continue;
+
+		cJSON *move = cJSON_CreateObject();
+		cJSON_AddNumberToObject(move, "index", i);
+		cJSON_AddStringToObject(move, "name", move_lib[i].name);
+		cJSON_AddNumberToObject(move, "flags", move_lib[i].flags);
+		cJSON_AddNumberToObject(move, "category", move_lib[i].category);
+
+		/* Laban placeholder (empty for now) */
+		cJSON *laban = cJSON_CreateObject();
+		cJSON_AddStringToObject(laban, "weight", "");
+		cJSON_AddStringToObject(laban, "time", "");
+		cJSON_AddStringToObject(laban, "space", "");
+		cJSON_AddStringToObject(laban, "flow", "");
+		cJSON_AddItemToObject(move, "laban", laban);
+
+		/* DOF params */
+		cJSON *params = cJSON_CreateObject();
+		for (int d = 0; d < MOVE_NUM_DOFS; d++) {
+			cJSON *dof = cJSON_CreateObject();
+			cJSON *harmonics = cJSON_CreateArray();
+
+			for (int h = 0; h < MOVE_NUM_HARMONICS; h++) {
+				cJSON *harm = cJSON_CreateObject();
+				cJSON_AddNumberToObject(harm, "amp",
+					move_lib[i].dof[d].h[h].amplitude);
+				cJSON_AddNumberToObject(harm, "phase",
+					move_lib[i].dof[d].h[h].phase);
+				cJSON_AddItemToArray(harmonics, harm);
+			}
+
+			cJSON_AddItemToObject(dof, "h", harmonics);
+			cJSON_AddNumberToObject(dof, "bias", move_lib[i].dof[d].bias);
+			cJSON_AddItemToObject(params, dof_names[d], dof);
+		}
+		cJSON_AddItemToObject(move, "params", params);
+
+		cJSON_AddItemToArray(moves, move);
+	}
+
+	cJSON_AddItemToObject(root, "moves", moves);
+
+	char *json_str = cJSON_Print(root);
+	cJSON_Delete(root);
+
+	if (!json_str)
+		return -1;
+
+	FILE *f = fopen(path, "w");
+	if (!f) {
+		free(json_str);
+		return -1;
+	}
+
+	fprintf(f, "%s\n", json_str);
+	fclose(f);
+	free(json_str);
+
+	return 0;
+}
+
+int move_lib_load(const char *path)
+{
+	FILE *f = fopen(path, "r");
+	if (!f)
+		return -1;
+
+	fseek(f, 0, SEEK_END);
+	long size = ftell(f);
+	fseek(f, 0, SEEK_SET);
+
+	char *json_str = malloc(size + 1);
+	if (!json_str) {
+		fclose(f);
+		return -1;
+	}
+
+	fread(json_str, 1, size, f);
+	json_str[size] = '\0';
+	fclose(f);
+
+	cJSON *root = cJSON_Parse(json_str);
+	free(json_str);
+
+	if (!root)
+		return -1;
+
+	cJSON *moves = cJSON_GetObjectItem(root, "moves");
+	if (!cJSON_IsArray(moves)) {
+		cJSON_Delete(root);
+		return -1;
+	}
+
+	int count = 0;
+	cJSON *move;
+	cJSON_ArrayForEach(move, moves) {
+		cJSON *idx_item = cJSON_GetObjectItem(move, "index");
+		if (!cJSON_IsNumber(idx_item))
+			continue;
+
+		int idx = (int)idx_item->valuedouble;
+		if (idx < 0 || idx >= MOVE_LIB_SIZE)
+			continue;
+
+		/* Name */
+		cJSON *name = cJSON_GetObjectItem(move, "name");
+		if (cJSON_IsString(name)) {
+			strncpy(move_lib[idx].name, name->valuestring,
+				MOVE_NAME_LEN - 1);
+			move_lib[idx].name[MOVE_NAME_LEN - 1] = '\0';
+		}
+
+		/* Flags and category */
+		cJSON *flags = cJSON_GetObjectItem(move, "flags");
+		if (cJSON_IsNumber(flags))
+			move_lib[idx].flags = (int)flags->valuedouble;
+
+		cJSON *category = cJSON_GetObjectItem(move, "category");
+		if (cJSON_IsNumber(category))
+			move_lib[idx].category = (int)category->valuedouble;
+
+		/* Params */
+		cJSON *params = cJSON_GetObjectItem(move, "params");
+		if (cJSON_IsObject(params)) {
+			for (int d = 0; d < MOVE_NUM_DOFS; d++) {
+				cJSON *dof = cJSON_GetObjectItem(params, dof_names[d]);
+				if (!cJSON_IsObject(dof))
+					continue;
+
+				cJSON *harmonics = cJSON_GetObjectItem(dof, "h");
+				if (cJSON_IsArray(harmonics)) {
+					int h = 0;
+					cJSON *harm;
+					cJSON_ArrayForEach(harm, harmonics) {
+						if (h >= MOVE_NUM_HARMONICS)
+							break;
+						cJSON *amp = cJSON_GetObjectItem(harm, "amp");
+						cJSON *phase = cJSON_GetObjectItem(harm, "phase");
+						if (cJSON_IsNumber(amp))
+							move_lib[idx].dof[d].h[h].amplitude =
+								(float)amp->valuedouble;
+						if (cJSON_IsNumber(phase))
+							move_lib[idx].dof[d].h[h].phase =
+								(float)phase->valuedouble;
+						h++;
+					}
+				}
+
+				cJSON *bias = cJSON_GetObjectItem(dof, "bias");
+				if (cJSON_IsNumber(bias))
+					move_lib[idx].dof[d].bias = (float)bias->valuedouble;
+			}
+		}
+
+		count++;
+	}
+
+	cJSON_Delete(root);
+	return count;
 }

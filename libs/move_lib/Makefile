@@ -6,8 +6,7 @@ CFLAGS = -Wall -Wextra -std=c11 -O2 -I include \
 SRC_DIR = src
 BUILD_DIR = build
 
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
+OBJS = $(BUILD_DIR)/move_lib.o
 
 .PHONY: all clean
 
@@ -16,7 +15,7 @@ all: $(BUILD_DIR) $(OBJS)
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+$(BUILD_DIR)/move_lib.o: $(SRC_DIR)/move_lib.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

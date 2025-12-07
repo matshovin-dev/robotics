@@ -98,14 +98,20 @@ static void render(void)
 	for (int i = 0; i < num_lines; i++) {
 		/* Parse name:value format */
 		char name[32] = "";
+		char str_value[32] = "";
 		float value = 0;
 
 		if (sscanf(status_lines[i], "%31[^:]:%f", name, &value) == 2) {
-			/* Draw name in white */
+			/* Numeric value - draw formatted */
 			char display[64];
 			snprintf(display, sizeof(display), "%-12s %8.2f", name,
 				 value);
 			text_draw(display, 10, y, 0.9f, 0.9f, 0.9f);
+		} else if (sscanf(status_lines[i], "%31[^:]:%31s", name, str_value) == 2) {
+			/* String value - draw as-is */
+			char display[64];
+			snprintf(display, sizeof(display), "%-12s %s", name, str_value);
+			text_draw(display, 10, y, 0.9f, 0.9f, 0.5f);
 		} else {
 			/* Raw line */
 			text_draw(status_lines[i], 10, y, 0.7f, 0.7f, 0.7f);

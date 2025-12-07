@@ -1,0 +1,1164 @@
+{
+	"moves": [
+		{
+			"index": 0,
+			"name": "still",
+			"flags": 8,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		},
+		{
+			"index": 1,
+			"name": "nod",
+			"flags": 10,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0.600000023841858,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		},
+		{
+			"index": 2,
+			"name": "tilt",
+			"flags": 10,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0.5,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		},
+		{
+			"index": 3,
+			"name": "twist",
+			"flags": 10,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0.40000000596046448,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		},
+		{
+			"index": 4,
+			"name": "bounce",
+			"flags": 10,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0.699999988079071,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		},
+		{
+			"index": 5,
+			"name": "sway",
+			"flags": 10,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0.5,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		},
+		{
+			"index": 6,
+			"name": "circle",
+			"flags": 10,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0.5,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0.5,
+							"phase": 0.25
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		},
+		{
+			"index": 7,
+			"name": "complex",
+			"flags": 10,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0.40000000596046448,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0.300000011920929,
+							"phase": 0.25
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0.5,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0.20000000298023224,
+							"phase": 0.5
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		},
+		{
+			"index": 8,
+			"name": "wave",
+			"flags": 10,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0.40000000596046448,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0.40000000596046448,
+							"phase": 0.33000001311302185
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0.300000011920929,
+							"phase": 0.6600000262260437
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		},
+		{
+			"index": 9,
+			"name": "pulse",
+			"flags": 10,
+			"category": 0,
+			"laban": {
+				"weight": "",
+				"time": "",
+				"space": "",
+				"flow": ""
+			},
+			"params": {
+				"rx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ry": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"rz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tx": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"ty": {
+					"h": [
+						{
+							"amp": 0.5,
+							"phase": 0
+						},
+						{
+							"amp": 0.25,
+							"phase": 0
+						},
+						{
+							"amp": 0.125,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				},
+				"tz": {
+					"h": [
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						},
+						{
+							"amp": 0,
+							"phase": 0
+						}
+					],
+					"bias": 0
+				}
+			}
+		}
+	]
+}

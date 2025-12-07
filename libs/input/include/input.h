@@ -36,6 +36,7 @@
 #define INPUT_ID_AUTOFADE   6   /* Auto-fade: wait for phase, fade, copy, reset */
 #define INPUT_ID_PLAY_SONG  7   /* Play first song from library, sync with move */
 #define INPUT_ID_SAVE_SONG  8   /* Save current bpm/phase to song library */
+#define INPUT_ID_CLICK      9   /* Toggle click track on/off */
 #define INPUT_ID_MOVE_0     10  /* Move presets 0-9 -> load to deck B */
 #define INPUT_ID_MOVE_1     11
 #define INPUT_ID_MOVE_2     12

@@ -10,11 +10,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <AudioToolbox/AudioToolbox.h>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
 
 /* Audio queue configuration */
 #define NUM_BUFFERS 3
 #define BUFFER_SIZE 4096
+
+/* Click track configuration */
+#define CLICK_FREQ 1000.0f       /* Hz */
+#define CLICK_DURATION 0.05f    /* seconds (50ms) */
+#define CLICK_SAMPLE_RATE 44100
+#define CLICK_AMPLITUDE 0.6f
 
 /* WAV file header */
 struct wav_header {
@@ -47,6 +58,19 @@ static struct {
 	int initialized;
 	int loaded;
 } player;
+
+/* Click track state */
+static struct {
+	AudioQueueRef queue;
+	AudioQueueBufferRef buffer;
+	AudioStreamBasicDescription format;
+	int16_t *samples;
+	uint32_t num_samples;
+	uint32_t current_sample;
+	int enabled;
+	int initialized;
+	int triggered;
+} click;
 
 /* Audio queue callback - fills buffer with samples */
 static void audio_callback(void *user_data, AudioQueueRef queue,
@@ -311,4 +335,120 @@ float song_player_get_duration(void)
 	if (!player.loaded || player.sample_rate == 0)
 		return 0.0f;
 	return (float)player.total_frames / (float)player.sample_rate;
+}
+
+/* Click track callback */
+static void click_callback(void *user_data, AudioQueueRef queue,
+			   AudioQueueBufferRef buffer)
+{
+	(void)user_data;
+
+	if (!click.triggered || !click.enabled) {
+		/* Fill with silence */
+		memset(buffer->mAudioData, 0, buffer->mAudioDataBytesCapacity);
+		buffer->mAudioDataByteSize = buffer->mAudioDataBytesCapacity;
+		AudioQueueEnqueueBuffer(queue, buffer, 0, NULL);
+		return;
+	}
+
+	uint32_t frames_to_copy = buffer->mAudioDataBytesCapacity / sizeof(int16_t);
+	uint32_t frames_left = click.num_samples - click.current_sample;
+
+	if (frames_to_copy > frames_left)
+		frames_to_copy = frames_left;
+
+	if (frames_to_copy > 0) {
+		memcpy(buffer->mAudioData,
+		       &click.samples[click.current_sample],
+		       frames_to_copy * sizeof(int16_t));
+		buffer->mAudioDataByteSize = frames_to_copy * sizeof(int16_t);
+		click.current_sample += frames_to_copy;
+	} else {
+		/* End of click - fill with silence */
+		memset(buffer->mAudioData, 0, buffer->mAudioDataBytesCapacity);
+		buffer->mAudioDataByteSize = buffer->mAudioDataBytesCapacity;
+		click.triggered = 0;
+	}
+
+	AudioQueueEnqueueBuffer(queue, buffer, 0, NULL);
+}
+
+/* Initialize click track */
+static int click_init(void)
+{
+	if (click.initialized)
+		return 0;
+
+	/* Generate sine wave samples */
+	click.num_samples = (uint32_t)(CLICK_SAMPLE_RATE * CLICK_DURATION);
+	click.samples = malloc(click.num_samples * sizeof(int16_t));
+	if (!click.samples)
+		return -1;
+
+	for (uint32_t i = 0; i < click.num_samples; i++) {
+		float t = (float)i / CLICK_SAMPLE_RATE;
+		float envelope = 1.0f;
+		/* Quick fade out at end to avoid click */
+		if (i > click.num_samples - 200)
+			envelope = (float)(click.num_samples - i) / 200.0f;
+		click.samples[i] = (int16_t)(32767.0f * CLICK_AMPLITUDE * envelope *
+					      sinf(2.0f * M_PI * CLICK_FREQ * t));
+	}
+
+	/* Setup audio format (mono) */
+	click.format.mSampleRate = CLICK_SAMPLE_RATE;
+	click.format.mFormatID = kAudioFormatLinearPCM;
+	click.format.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger |
+				    kLinearPCMFormatFlagIsPacked;
+	click.format.mBytesPerPacket = sizeof(int16_t);
+	click.format.mFramesPerPacket = 1;
+	click.format.mBytesPerFrame = sizeof(int16_t);
+	click.format.mChannelsPerFrame = 1;
+	click.format.mBitsPerChannel = 16;
+
+	/* Create audio queue */
+	OSStatus status = AudioQueueNewOutput(&click.format, click_callback,
+					      NULL, NULL, NULL, 0,
+					      &click.queue);
+	if (status != noErr) {
+		free(click.samples);
+		click.samples = NULL;
+		return -1;
+	}
+
+	/* Allocate buffer */
+	AudioQueueAllocateBuffer(click.queue, BUFFER_SIZE, &click.buffer);
+
+	/* Prime buffer with silence and start queue */
+	memset(click.buffer->mAudioData, 0, click.buffer->mAudioDataBytesCapacity);
+	click.buffer->mAudioDataByteSize = click.buffer->mAudioDataBytesCapacity;
+	AudioQueueEnqueueBuffer(click.queue, click.buffer, 0, NULL);
+	AudioQueueStart(click.queue, NULL);
+
+	click.initialized = 1;
+	click.enabled = 0;
+	click.triggered = 0;
+
+	return 0;
+}
+
+void song_player_click_enable(int enable)
+{
+	if (!click.initialized)
+		click_init();
+	click.enabled = enable;
+	if (!enable)
+		click.triggered = 0;
+}
+
+void song_player_click_trigger(void)
+{
+	if (!click.initialized)
+		click_init();
+	if (!click.enabled)
+		return;
+
+	/* Reset to start of click sound */
+	click.current_sample = 0;
+	click.triggered = 1;
 }

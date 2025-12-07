@@ -21,6 +21,8 @@ struct viz_status {
 	struct {
 		char name[VIZ_STATUS_NAME_LEN];
 		float value;
+		char str_value[VIZ_STATUS_NAME_LEN];
+		int is_string;
 	} pairs[VIZ_STATUS_MAX_PAIRS];
 };
 
@@ -39,6 +41,11 @@ void viz_status_set(struct viz_status *st, const char *name, float value);
  * Add an int value to the buffer
  */
 void viz_status_set_int(struct viz_status *st, const char *name, int value);
+
+/**
+ * Add a string value to the buffer
+ */
+void viz_status_set_str(struct viz_status *st, const char *name, const char *value);
 
 /**
  * Send all buffered values as UDP packet

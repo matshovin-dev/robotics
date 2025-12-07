@@ -30,6 +30,7 @@
 #define MIDI_NOTE_COPY        8
 #define MIDI_NOTE_PLAY_SONG   9
 #define MIDI_NOTE_AUTOFADE    16
+#define MIDI_NOTE_CLICK       17
 #define MIDI_NOTE_SAVE_SONG   33
 
 /* Encoder step sizes */
@@ -83,9 +84,9 @@ static int queue_pop(struct input_event *ev)
 static float encoder_delta(int value)
 {
 	if (value == 1)
-		return 1.0f;   /* clockwise */
+		return -1.0f;  /* clockwise */
 	if (value == 65)
-		return -1.0f;  /* counter-clockwise */
+		return 1.0f;   /* counter-clockwise */
 	return 0.0f;
 }
 
@@ -211,6 +212,13 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 						if (value > 0) {  /* button press */
 							ev.type = INPUT_BUTTON;
 							ev.id = INPUT_ID_SAVE_SONG;
+							ev.value = 1.0f;
+						}
+						break;
+					case MIDI_NOTE_CLICK:
+						if (value > 0) {  /* button press */
+							ev.type = INPUT_BUTTON;
+							ev.id = INPUT_ID_CLICK;
 							ev.value = 1.0f;
 						}
 						break;

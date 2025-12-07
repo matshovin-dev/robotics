@@ -80,4 +80,18 @@ float song_player_get_position(void);
  */
 float song_player_get_duration(void);
 
+/**
+ * song_player_click_enable - Enable/disable click track
+ * @enable: 1 to enable, 0 to disable
+ */
+void song_player_click_enable(int enable);
+
+/**
+ * song_player_click_trigger - Trigger a click sound
+ *
+ * Call this when phase crosses 3π/2 (move downbeat).
+ * Plays a short 1000Hz sine pip (~0.1 sec).
+ */
+void song_player_click_trigger(void);
+
 #endif /* SONG_PLAYER_H */
