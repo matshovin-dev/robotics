@@ -44,9 +44,10 @@ int end_beat = -1;  // -1 means end of file
 
 // Audio playback
 AudioQueueRef audio_queue = NULL;
-int playback_position = 0;
-int is_playing = 0;
-int should_stop = 0;
+volatile double playback_position = 0;  // Position in source file
+volatile int is_playing = 0;
+volatile int should_stop = 0;
+volatile int half_speed = 0;  // Toggle for half speed playback
 
 // Cues
 Cue* cues = NULL;
@@ -63,13 +64,17 @@ int beat_to_sample(int beat) {
     return (int)(phase_offset_samples + (beat - 1) * samples_per_beat);
 }
 
-int sample_to_beat(int sample_pos) {
+int sample_to_beat(double sample_pos) {
     double seconds_per_beat = 60.0 / bpm;
     double samples_per_beat = seconds_per_beat * sample_rate;
     double phase_offset_samples = master_phase * samples_per_beat;
     // Use round() to match cue_recorder behavior
     int beat = (int)((sample_pos - phase_offset_samples) / samples_per_beat + 0.5) + 1;
     return beat < 1 ? 1 : beat;
+}
+
+double get_effective_bpm(void) {
+    return half_speed ? bpm * 0.5 : bpm;
 }
 
 void audio_callback(void* user_data, AudioQueueRef queue, AudioQueueBufferRef buffer) {
@@ -79,6 +84,7 @@ void audio_callback(void* user_data, AudioQueueRef queue, AudioQueueBufferRef bu
         return;
     }
 
+    double speed = half_speed ? 0.5 : 1.0;
     int end_sample = (end_beat > 0) ? beat_to_sample(end_beat + 1) : num_samples;
     if (end_sample > num_samples) end_sample = num_samples;
 
@@ -87,19 +93,20 @@ void audio_callback(void* user_data, AudioQueueRef queue, AudioQueueBufferRef bu
     int samples_written = 0;
 
     for (int i = 0; i < frames_to_fill; i++) {
-        if (playback_position >= end_sample) {
+        int pos = (int)playback_position;
+        if (pos >= end_sample) {
             is_playing = 0;
             should_stop = 1;
             out[samples_written++] = 0;
             out[samples_written++] = 0;
         } else {
-            int idx = playback_position * num_channels_wav;
+            int idx = pos * num_channels_wav;
             int16_t left = (int16_t)(samples[idx] * 32767.0f);
             int16_t right = (num_channels_wav == 2) ?
                 (int16_t)(samples[idx + 1] * 32767.0f) : left;
             out[samples_written++] = left;
             out[samples_written++] = right;
-            playback_position++;
+            playback_position += speed;
         }
     }
 
@@ -328,7 +335,7 @@ int main(int argc, char* argv[]) {
         if (i < num_cues - 1) fprintf(stderr, ", ");
     }
     fprintf(stderr, "\n");
-    fprintf(stderr, "Press SPACE to pause, q to quit\n\n");
+    fprintf(stderr, "Press SPACE to pause, h for half speed, q to quit\n\n");
 
     enable_raw_mode();
 
@@ -359,6 +366,10 @@ int main(int argc, char* argv[]) {
                     AudioQueueStart(audio_queue, NULL);
                     fprintf(stderr, "[Playing]\n");
                 }
+            } else if (c == 'h') {
+                half_speed = !half_speed;
+                fprintf(stderr, "[Speed: %s, effective BPM: %.1f]\n",
+                        half_speed ? "0.5x" : "1.0x", get_effective_bpm());
             }
         }
     }

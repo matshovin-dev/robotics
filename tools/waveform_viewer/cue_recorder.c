@@ -34,8 +34,10 @@ double master_phase = 0.0;
 
 // Audio playback
 AudioQueueRef audio_queue = NULL;
-int playback_position = 0;
-int is_playing = 0;
+volatile double source_position = 0;     // Position in source file (for reading samples)
+volatile double output_samples = 0;      // Total output samples played (for beat counting)
+volatile int is_playing = 0;
+volatile int half_speed = 0;  // Toggle for half speed playback
 
 // Output file
 FILE* output_file = NULL;
@@ -49,23 +51,26 @@ void audio_callback(void* user_data, AudioQueueRef queue, AudioQueueBufferRef bu
         return;
     }
 
+    double speed = half_speed ? 0.5 : 1.0;
     int16_t* out = (int16_t*)buffer->mAudioData;
     int frames_to_fill = AUDIO_BUFFER_SIZE;
     int samples_written = 0;
 
     for (int i = 0; i < frames_to_fill; i++) {
-        if (playback_position >= num_samples) {
+        int pos = (int)source_position;
+        if (pos >= num_samples) {
             is_playing = 0;
             out[samples_written++] = 0;
             out[samples_written++] = 0;
         } else {
-            int idx = playback_position * num_channels_wav;
+            int idx = pos * num_channels_wav;
             int16_t left = (int16_t)(samples[idx] * 32767.0f);
             int16_t right = (num_channels_wav == 2) ?
                 (int16_t)(samples[idx + 1] * 32767.0f) : left;
             out[samples_written++] = left;
             out[samples_written++] = right;
-            playback_position++;
+            source_position += speed;
+            output_samples += 1.0;  // Always increment by 1 (real time)
         }
     }
 
@@ -124,11 +129,24 @@ float* load_wav(const char* filename) {
     return data;
 }
 
-int get_current_beat(void) {
+// Get beat number based on source position (for recording cues)
+int get_source_beat(void) {
     double seconds_per_beat = 60.0 / bpm;
     double samples_per_beat = seconds_per_beat * sample_rate;
     double phase_offset_samples = master_phase * samples_per_beat;
-    int nearest_beat = (int)((playback_position - phase_offset_samples) / samples_per_beat + 0.5);
+    int nearest_beat = (int)((source_position - phase_offset_samples) / samples_per_beat + 0.5);
+    if (nearest_beat < 0) nearest_beat = 0;
+    return nearest_beat + 1;
+}
+
+// Get beat number based on real elapsed time (for display while playing)
+int get_realtime_beat(void) {
+    double effective_bpm = half_speed ? bpm * 0.5 : bpm;
+    double seconds_per_beat = 60.0 / effective_bpm;
+    double samples_per_beat = seconds_per_beat * sample_rate;
+    double phase_samples = master_phase * (60.0 / bpm) * sample_rate;  // Phase in original tempo
+    double phase_adjusted = half_speed ? phase_samples * 2.0 : phase_samples;
+    int nearest_beat = (int)((output_samples - phase_adjusted) / samples_per_beat + 0.5);
     if (nearest_beat < 0) nearest_beat = 0;
     return nearest_beat + 1;
 }
@@ -245,7 +263,7 @@ int main(int argc, char* argv[]) {
 
     fprintf(stderr, "\nBPM: %.1f, Phase: %.3f\n", bpm, master_phase);
     fprintf(stderr, "Output: %s\n", output_path);
-    fprintf(stderr, "Press SPACE to play, 1/2/3 for cues, q to quit\n\n");
+    fprintf(stderr, "Press SPACE to play, 1/2/3 for cues, h for half speed, q to quit\n\n");
 
     enable_raw_mode();
 
@@ -262,7 +280,8 @@ int main(int argc, char* argv[]) {
                     if (is_playing) {
                         is_playing = 0;
                         AudioQueuePause(audio_queue);
-                        fprintf(stderr, "[Paused at beat %d]\n", get_current_beat());
+                        fprintf(stderr, "[Paused at beat %d (source: %d)]\n",
+                                get_realtime_beat(), get_source_beat());
                     } else {
                         is_playing = 1;
                         AudioQueueStart(audio_queue, NULL);
@@ -270,17 +289,22 @@ int main(int argc, char* argv[]) {
                     }
                     break;
                 case '0':
-                    playback_position = 0;
+                    source_position = 0;
+                    output_samples = 0;
                     fprintf(stderr, "[Reset]\n");
                     break;
                 case '1':
-                    write_cue(0, get_current_beat());
+                    write_cue(0, get_source_beat());
                     break;
                 case '2':
-                    write_cue(1, get_current_beat());
+                    write_cue(1, get_source_beat());
                     break;
                 case '3':
-                    write_cue(2, get_current_beat());
+                    write_cue(2, get_source_beat());
+                    break;
+                case 'h':
+                    half_speed = !half_speed;
+                    fprintf(stderr, "[Speed: %s]\n", half_speed ? "0.5x" : "1.0x");
                     break;
                 case 'q':
                 case 27:  // ESC
@@ -290,9 +314,10 @@ int main(int argc, char* argv[]) {
         }
 
         // Check if playback finished
-        if (!is_playing && playback_position >= num_samples) {
+        if (!is_playing && source_position >= num_samples) {
             fprintf(stderr, "[End of file]\n");
-            playback_position = 0;
+            source_position = 0;
+            output_samples = 0;
         }
     }
 

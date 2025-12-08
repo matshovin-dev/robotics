@@ -1,0 +1,7 @@
+
+./cue_recorder /Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav test.txt 150 
+
+./cue_player /Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav cue.txt 120 0 0 20
+
+./cue_expand test.txt coreo.txt
+
