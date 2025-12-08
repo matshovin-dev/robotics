@@ -32,7 +32,7 @@ DEPS = $(MOVE_LIB) $(STEWART_GEOM) $(MATH_UTILS) $(SONG_LIB)
 
 .PHONY: all clean deps
 
-all: deps wb_move_test wb_mixer_test wb_input_test
+all: deps wb_move_test wb_mixer_test wb_input_test wb_coreo_player
 
 deps:
 	$(MAKE) -C ../libs/math
@@ -50,5 +50,8 @@ wb_mixer_test: wb_mixer_test.c $(DEPS)
 wb_input_test: wb_input_test.c $(DEPS) $(INPUT_LIB)
 	$(CC) $(CFLAGS) $< $(DEPS) $(INPUT_LIB) $(VIZ_COMMON) -o $@ $(LDFLAGS)
 
+wb_coreo_player: wb_coreo_player.c $(DEPS)
+	$(CC) $(CFLAGS) $< $(DEPS) $(VIZ_COMMON) -o $@ $(LDFLAGS)
+
 clean:
-	rm -f wb_move_test wb_mixer_test wb_input_test
+	rm -f wb_move_test wb_mixer_test wb_input_test wb_coreo_player
