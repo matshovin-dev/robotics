@@ -32,7 +32,7 @@ DEPS = $(MOVE_LIB) $(STEWART_GEOM) $(MATH_UTILS) $(SONG_LIB)
 
 .PHONY: all clean deps
 
-all: deps wb_move_test wb_mixer_test wb_input_test wb_coreo_player
+all: deps wb_move_test wb_mixer_test wb_input_test wb_coreo_player wb_plotter
 
 deps:
 	$(MAKE) -C ../libs/math
@@ -53,5 +53,11 @@ wb_input_test: wb_input_test.c $(DEPS) $(INPUT_LIB)
 wb_coreo_player: wb_coreo_player.c $(DEPS)
 	$(CC) $(CFLAGS) $< $(DEPS) $(VIZ_COMMON) -o $@ $(LDFLAGS)
 
+wb_plotter: wb_plotter.c
+	$(CC) -Wall -std=c11 -O2 $< -o $@ -lm
+
+wb_plotter_live: wb_plotter_live.c
+	$(CC) -Wall -std=c11 -O2 $< -o $@ -lm $(shell sdl2-config --cflags --libs)
+
 clean:
-	rm -f wb_move_test wb_mixer_test wb_input_test wb_coreo_player
+	rm -f wb_move_test wb_mixer_test wb_input_test wb_coreo_player wb_plotter wb_plotter_live

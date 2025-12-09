@@ -1,0 +1,26 @@
+Nettopp – overgangsgesten kan ikke være én fast ting. Den må være en funksjon av nåværende tilstand.
+Noen mulige strategier:
+1. "Check" – forsterk før du snur
+Ta nåværende bevegelsesretning, overdrive den kort (50-100ms), så gå til ny figur. Som en danser som markerer retningen før skifte.
+2. "Home" – via nøytral
+En eller flere "attraktorer" som er trygge mellomstasjoner. Flat plattform er én. Men kanskje du har 2-3 karakteristiske poser som fungerer som "hjemmebaser" avhengig av hvilken region av tilstandsrommet du er i.
+3. "Kontrast" – aksenter via opposisjon
+Kort bevegelse motsatt av der du skal. Skaper spenning og gjør den nye retningen tydeligere.
+4. "Nearest extreme"
+Fra nåværende posisjon, gå til nærmeste "interessante pose" (maks tilt, maks heave, etc.), hold et øyeblikk, så videre.
+Spørsmål som former dette:
+
+Har plattformen noen poser som bare ser bra ut? De er kandidater for home/attraktorer.
+Er noen DOF-kombinasjoner spesielt dramatiske? De er kandidater for aksenter.
+Hva gjør musikken i overgangen? Beat-synkronisert aksent vs. breath/pause?
+
+Kanskje du ender med en liten "frasebook" – ikke av figurer, men av overgangstransformasjoner som opererer på (nåtilstand → aksent → neste figur).
+
+
+
+self ha robot moves inni mellom 
+
+redusee hastighet og stoppee
+
+slenge
+

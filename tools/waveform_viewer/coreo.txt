@@ -2,9 +2,9 @@
 2 		still	
 3 		still	
 4 		still	
-5 		still	
+5 		still	p8
 6 		still	
-7 		still	f4
+7 		still	
 8 		still	
 9 		twist	
 10 		twist	
@@ -19,9 +19,9 @@
 19 		twist
 20 		twist
 21 		twist
-22 		twist
+22 		twist	p8
 23 		twist
-24 		twist	f4
+24 		twist	
 25 		twist	
 26 		bounce	
 27 _.		bounce	
@@ -34,10 +34,10 @@
 34 		bounce
 35 		bounce
 36 		bounce
-37 		bounce
+37 		bounce p9
 38 		bounce
 39 		bounce
-40 		bounce	f1
+40 		bounce	
 41 		sway	
 42 		sway
 43 _.		sway
@@ -52,8 +52,8 @@
 52 		sway
 53 		sway
 54 		sway
-55 		sway
-56 		sway	f1
+55 		sway	p3
+56 		sway	
 57 		wave	
 58 		wave
 59 _.		wave
@@ -68,7 +68,7 @@
 68 		wave
 69 		wave	
 70 		wave
-71 		wave	f2
+71 		wave	p3
 72 		wave	
 73 		complex	
 74 		complex
@@ -77,7 +77,7 @@
 77 		complex
 78 		complex
 79 		complex
-80 		complex	f1
+80 		complex	p1
 81 		pulse	
 82 		pulse
 83 _.		pulse
