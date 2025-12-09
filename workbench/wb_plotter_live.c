@@ -11,17 +11,22 @@
 #include "stewart/pose.h"
 #include "stewart/geometry.h"
 #include "viz_sender.h"
+#include "robotics/math/utils.h"
 #include <SDL.h>
 #include <math.h>
 #include <stdbool.h>
 #include <unistd.h>
 
+void draw_grid(SDL_Renderer *renderer);
+
 // ============ KONFIGURASJON ============
 
 // Tidsintervall
 #define T_START 0.0
-#define T_END 3.0
+#define T_END 8.0
 #define T_STEP 1.0 / 200.0
+#define T_MIX_START 4
+#define T_MIX_END 5
 
 // Vindu-størrelse
 #define WIDTH 1200
@@ -40,52 +45,121 @@ float T;
 float master_phase = 0.0f;
 float moving_phase = 0.0f;
 
-struct stewart_pose pose_graph;
+struct stewart_pose pose_graph_1;
+struct stewart_pose pose_graph_2;
+struct stewart_pose pose_graph_mix;
 struct stewart_pose pose_a;
+struct stewart_pose pose_b;
+struct stewart_pose pose_mix;
 struct move_playback pb;
 const struct stewart_geometry *geom = &ROBOT_MX64;
 struct move m;
 int move_no = 21;
+int move_no_b = 21;
 double t_current = 1.0;	 // sec
 char str[32]; /* div bruk */
 int viz_sock = -1;
 
+double y0(double t)
+{
+	return pose_graph_1.rx;
+}
+
 double y1(double t)
 {
-	return pose_graph.rx;
+	return pose_graph_1.ry;
 }
 
 double y2(double t)
 {
-	return pose_graph.ry;
+	return pose_graph_1.rz;
 }
 
 double y3(double t)
 {
-	return pose_graph.rz;
+	return pose_graph_1.tx;
 }
 
 double y4(double t)
 {
-	return pose_graph.tx;
+	return pose_graph_1.ty;
 }
 
 double y5(double t)
 {
-	return pose_graph.ty;
+	return pose_graph_1.tz;
 }
+
+/* neste move */
 
 double y6(double t)
 {
-	return pose_graph.tz;
+	return pose_graph_2.rx;
+}
+
+double y7(double t)
+{
+	return pose_graph_2.ry;
+}
+
+double y8(double t)
+{
+	return pose_graph_2.rz;
+}
+
+double y9(double t)
+{
+	return pose_graph_2.tx;
+}
+
+double y10(double t)
+{
+	return pose_graph_2.ty;
+}
+
+double y11(double t)
+{
+	return pose_graph_2.tz;
+}
+
+/* mixer ut */
+
+double y12(double t)
+{
+	return pose_graph_mix.rx;
+}
+
+double y13(double t)
+{
+	return pose_graph_mix.ry;
+}
+
+double y14(double t)
+{
+	return pose_graph_mix.rz;
+}
+
+double y15(double t)
+{
+	return pose_graph_mix.tx;
+}
+
+double y16(double t)
+{
+	return pose_graph_mix.ty;
+}
+
+double y17(double t)
+{
+	return pose_graph_mix.tz;
 }
 
 /* Overskriver - blå */
 
-double y7(double t)
-{
-	return 0.0 * sin(f0 * 2.0 * M_PI * t + ph + master_phase);
-}
+// double y7(double t)
+// {
+// 	return 0.0 * sin(f0 * 2.0 * M_PI * t + ph + master_phase);
+// }
 
 /* @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ */
 
@@ -118,30 +192,6 @@ int map_y_to_screen(double y, int subplot_no)
 	return subplot_top + local_y;
 }
 
-void draw_grid(SDL_Renderer *renderer)
-{
-	SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);  // Mørk grå grid
-
-	// Vertikale linjer (t-aksen)
-	float t = 0.0f;
-	while (t < T_END) {
-		int x = map_t_to_x(t);
-		SDL_RenderDrawLine(renderer, x, 0, x, HEIGHT);
-		t = t + T;
-	}
-
-	// Horisontal y=0 linje for hver subplot
-	for (int i = 0; i < NO_OF_SUBPLOTS; i++) {
-		int y0 = map_y_to_screen(0.0, i);
-		SDL_RenderDrawLine(renderer, 0, y0, WIDTH, y0);
-	}
-
-	// Current time bar
-	SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-	SDL_RenderDrawLine(renderer, map_t_to_x(t_current), 0,
-			   map_t_to_x(t_current), HEIGHT);
-}
-
 void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no)
 {
 	// En graf av gangen - graph_no (sub plot nr)
@@ -149,22 +199,26 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no)
 	SDL_SetRenderDrawColor(renderer, graph->r, graph->g, graph->b, 255);
 
 	int prev_x = -1;
-	int prev_y1 = -1, prev_y2 = -1, prev_y3 = -1, prev_y4 = -1,
-	    prev_y5 = -1, prev_y6 = -1;
+	int prev_y = -1;
 
 	move_playback_reset(&pb);
 	for (double t = T_START; t <= T_END; t += T_STEP) {
 		move_playback_tick(&pb, T_STEP);
-		move_evaluate(&move_lib[move_no], &pb, geom, &pose_graph);
+		move_evaluate(&move_lib[move_no], &pb, geom, &pose_graph_1);
+		move_evaluate(&move_lib[move_no_b], &pb, geom, &pose_graph_2);
+		move_mixer.deck_a = move_no;
+		move_mixer.deck_b = move_no_b;
+		move_mixer.crossfader = clampf(t - T_MIX_START, 0.0, 1.0);
+		move_evaluate_mixed(&move_mixer, &pb, geom, &pose_graph_mix);
 		int x = map_t_to_x(t);
-		int y1 = map_y_to_screen(graph->func(t), graph_no);
+		int y = map_y_to_screen(graph->func(t), graph_no % 6);
 
 		if (prev_x >= 0) {
-			SDL_RenderDrawLine(renderer, prev_x, prev_y1, x, y1);
+			SDL_RenderDrawLine(renderer, prev_x, prev_y, x, y);
 		}
 
 		prev_x = x;
-		prev_y1 = y1;
+		prev_y = y;
 	}
 }
 
@@ -175,6 +229,11 @@ int main(void)
 	move_playback_set_bpm(&pb, 150);
 	T = 1.0f / f0;
 
+	move_mixer.deck_a = move_no;
+	move_mixer.deck_b = move_no_b;
+	move_mixer.volume_a = 1.0f;
+	move_mixer.volume_b = 1.0f;
+
 	// Opprett viz socket
 	viz_sock = viz_sender_create();
 	if (viz_sock < 0) {
@@ -183,13 +242,24 @@ int main(void)
 
 	// ============ SETT OPP GRAFENE HER ============
 	struct Graph graphs[] = {
-		{ y1, 244, 67, 54, "g1" },  // Rød
-		{ y2, 244, 67, 54, "g2" },  // Rød
-		{ y3, 244, 67, 54, "g3" },  // Rød
-		{ y4, 244, 67, 54, "g4" },  // Rød
-		{ y5, 244, 67, 54, "g5" },  // Rød
-		{ y6, 244, 67, 54, "g6" },  // Rød
-		{ y7, 33, 150, 243, "g6" }  // Blå
+		{ y0, 244, 67, 54, "g1" },  // Rød
+		{ y1, 244, 67, 54, "g2" },  // Rød
+		{ y2, 244, 67, 54, "g3" },  // Rød
+		{ y3, 244, 67, 54, "g4" },  // Rød
+		{ y4, 244, 67, 54, "g5" },  // Rød
+		{ y5, 244, 67, 54, "g6" },  // Rød
+		{ y6, 33, 150, 243, "g6" },  // Blå
+		{ y7, 33, 150, 243, "g6" },  // Blå
+		{ y8, 33, 150, 243, "g6" },  // Blå
+		{ y9, 33, 150, 243, "g6" },  // Blå
+		{ y10, 33, 150, 243, "g6" },  // Blå
+		{ y11, 33, 150, 243, "g6" },  // Blå
+		{ y12, 200, 200, 200, "mix" },	// Hvit - rx
+		{ y13, 200, 200, 200, "mix" },	// Hvit - ry
+		{ y14, 200, 200, 200, "mix" },	// Hvit - rz
+		{ y15, 200, 200, 200, "mix" },	// Hvit - tx
+		{ y16, 200, 200, 200, "mix" },	// Hvit - ty
+		{ y17, 200, 200, 200, "mix" }  // Hvit - tz
 	};
 
 	// Initialiser SDL
@@ -234,36 +304,64 @@ int main(void)
 				case SDLK_ESCAPE:
 					running = false;
 					break;
+				case SDLK_UP:
+					move_no_b += (move_no_b < 98);
+					move_mixer.deck_b = move_no_b;
+					snprintf(str, sizeof(str),
+						 "Move %d/%d : t=%.2f", move_no,
+						 move_no_b, t_current);
+					SDL_SetWindowTitle(window, str);
+					break;
+				case SDLK_DOWN:
+					move_no_b -= (move_no_b > 0);
+					move_mixer.deck_b = move_no_b;
+					snprintf(str, sizeof(str),
+						 "Move %d/%d : t=%.2f", move_no,
+						 move_no_b, t_current);
+					SDL_SetWindowTitle(window, str);
+					break;
 				case SDLK_LEFT:
-					t_current -= 0.02;
+					t_current -= 0.04;
 					if (t_current < T_START)
 						t_current = T_START;
 					pb.t = t_current;
-					move_evaluate(&move_lib[move_no], &pb,
-						      geom, &pose_a);
-					pose_a.ty += geom->home_height;
-					viz_sender_send_pose(viz_sock, &pose_a,
-							     ROBOT_TYPE_MX64,
-							     9002);
+					move_mixer.deck_a = move_no;
+					move_mixer.deck_b = move_no_b;
+					move_mixer.crossfader =
+						clampf(t_current - T_MIX_START,
+						       0.0, 1.0);
+					move_evaluate_mixed(&move_mixer, &pb,
+							    geom, &pose_mix);
+					pose_mix.ty += geom->home_height;
+					viz_sender_send_pose(
+						viz_sock, &pose_mix,
+						ROBOT_TYPE_MX64, 9002);
 					snprintf(str, sizeof(str),
-						 "Move %d : t=%.2f", move_no,
-						 t_current);
+						 "Move %d/%d : t=%.2f xf=%.2f",
+						 move_no, move_no_b, t_current,
+						 move_mixer.crossfader);
 					SDL_SetWindowTitle(window, str);
 					break;
 				case SDLK_RIGHT:
-					t_current += 0.02;
+					t_current += 0.04;
 					if (t_current > T_END)
 						t_current = T_END;
 					pb.t = t_current;
-					move_evaluate(&move_lib[move_no], &pb,
-						      geom, &pose_a);
-					pose_a.ty += geom->home_height;
-					viz_sender_send_pose(viz_sock, &pose_a,
-							     ROBOT_TYPE_MX64,
-							     9002);
+					move_mixer.deck_a = move_no;
+					move_mixer.deck_b = move_no_b;
+					move_mixer.crossfader =
+						clampf(t_current - T_MIX_START,
+						       0.0, 1.0);
+					move_evaluate_mixed(&move_mixer, &pb,
+							    geom, &pose_mix);
+					pose_mix.ty += geom->home_height;
+					viz_sender_send_pose(
+						viz_sock, &pose_mix,
+						ROBOT_TYPE_MX64, 9002);
 					snprintf(str, sizeof(str),
-						 "Move %d : t=%.2f", move_no,
-						 t_current);
+						 "Move %d/%d : t=%.2f xf=%.2f",
+						 move_no, move_no_b, t_current,
+						 move_mixer.crossfader);
 					SDL_SetWindowTitle(window, str);
 					break;
 				case SDLK_k:
@@ -281,10 +379,9 @@ int main(void)
 
 		draw_grid(renderer);
 
-		for (int i = 0; i < NO_OF_SUBPLOTS; i++) {
+		for (int i = 0; i < NO_OF_SUBPLOTS * 3; i++) {
 			draw_graph(renderer, &graphs[i], i);
 		}
-		draw_graph(renderer, &graphs[6], 1);  // overskrive
 
 		SDL_RenderPresent(renderer);
 		SDL_Delay(16);	// ~60 FPS
@@ -298,4 +395,30 @@ int main(void)
 	SDL_Quit();
 
 	return 0;
+}
+
+/* ----------------------------------------------------- */
+
+void draw_grid(SDL_Renderer *renderer)
+{
+	SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);  // Mørk grå grid
+
+	// Vertikale linjer (t-aksen)
+	float t = 0.0f;
+	while (t < T_END) {
+		int x = map_t_to_x(t);
+		SDL_RenderDrawLine(renderer, x, 0, x, HEIGHT);
+		t = t + T;
+	}
+
+	// Horisontal y=0 linje for hver subplot
+	// for (int i = 0; i < NO_OF_SUBPLOTS; i++) {
+	// 	int y0 = map_y_to_screen(0.0, i);
+	// 	SDL_RenderDrawLine(renderer, 0, y0, WIDTH, y0);
+	// }
+
+	// Current time bar
+	SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+	SDL_RenderDrawLine(renderer, map_t_to_x(t_current), 0,
+			   map_t_to_x(t_current), HEIGHT);
 }
