@@ -22,11 +22,11 @@ void draw_grid(SDL_Renderer *renderer);
 // ============ KONFIGURASJON ============
 
 // Tidsintervall
-#define T_START 0.0
-#define T_END 8.0
-#define T_STEP 1.0 / 200.0
-#define T_MIX_START 4
-#define T_MIX_END 5
+#define T_START 0.0f
+#define T_END 8.0f
+#define T_STEP 1.0f / 200.0f
+#define T_MIX_START 4.0f
+#define T_MIX_END 5.0f
 
 // Vindu-størrelse
 #define WIDTH 1200
@@ -34,7 +34,7 @@ void draw_grid(SDL_Renderer *renderer);
 
 // Subplots
 #define NO_OF_SUBPLOTS 6
-#define SUBPLOT_Y_OFFSET 3.5
+#define SUBPLOT_Y_OFFSET 3.5f
 #define NO_OF_GRAPHS 7
 
 /* @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ */
@@ -56,138 +56,132 @@ const struct stewart_geometry *geom = &ROBOT_MX64;
 struct move m;
 int move_no = 21;
 int move_no_b = 21;
-double t_current = 1.0;	 // sec
+float t_current = 1.0f;	 // sec
+int t_is_running = 0;
 char str[32]; /* div bruk */
 int viz_sock = -1;
 
-double y0(double t)
+float g1_rx(float t)
 {
 	return pose_graph_1.rx;
 }
 
-double y1(double t)
+float g1_ry(float t)
 {
 	return pose_graph_1.ry;
 }
 
-double y2(double t)
+float g1_rz(float t)
 {
 	return pose_graph_1.rz;
 }
 
-double y3(double t)
+float g1_tx(float t)
 {
 	return pose_graph_1.tx;
 }
 
-double y4(double t)
+float g1_ty(float t)
 {
 	return pose_graph_1.ty;
 }
 
-double y5(double t)
+float g1_tz(float t)
 {
 	return pose_graph_1.tz;
 }
 
 /* neste move */
 
-double y6(double t)
+float g2_rx(float t)
 {
 	return pose_graph_2.rx;
 }
 
-double y7(double t)
+float g2_ry(float t)
 {
 	return pose_graph_2.ry;
 }
 
-double y8(double t)
+float g2_rz(float t)
 {
 	return pose_graph_2.rz;
 }
 
-double y9(double t)
+float g2_tx(float t)
 {
 	return pose_graph_2.tx;
 }
 
-double y10(double t)
+float g2_ty(float t)
 {
 	return pose_graph_2.ty;
 }
 
-double y11(double t)
+float g2_tz(float t)
 {
 	return pose_graph_2.tz;
 }
 
 /* mixer ut */
 
-double y12(double t)
+float mix_rx(float t)
 {
 	return pose_graph_mix.rx;
 }
 
-double y13(double t)
+float mix_ry(float t)
 {
 	return pose_graph_mix.ry;
 }
 
-double y14(double t)
+float mix_rz(float t)
 {
 	return pose_graph_mix.rz;
 }
 
-double y15(double t)
+float mix_tx(float t)
 {
 	return pose_graph_mix.tx;
 }
 
-double y16(double t)
+float mix_ty(float t)
 {
 	return pose_graph_mix.ty;
 }
 
-double y17(double t)
+float mix_tz(float t)
 {
 	return pose_graph_mix.tz;
 }
 
-/* Overskriver - blå */
-
-// double y7(double t)
-// {
-// 	return 0.0 * sin(f0 * 2.0 * M_PI * t + ph + master_phase);
-// }
-
 /* @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ */
 
 struct Graph {
-	double (*func)(double);
+	float (*func)(float);
 	Uint8 r, g, b;
 	const char *name;
 };
 
-int map_t_to_x(double t)
+int map_t_to_x(float t)
 {
 	return (int)((t - T_START) / (T_END - T_START) * WIDTH);
 }
 
-int map_y_to_screen(double y, int subplot_no)
+int map_y_to_screen(float y, int subplot_no)
 {
-	double y_scale = 0.06;
+	float y_scale = 0.06;
 	// Y-range per subplot
-	double y_min = -1.5;
-	double y_max = 1.5;
+	float y_min = -1.5;
+	float y_max = 1.5;
 
 	// Hver subplot tar like mye plass på skjermen
 	int subplot_height = HEIGHT / NO_OF_SUBPLOTS;
 	int subplot_top = subplot_no * subplot_height;
 
 	// Map y fra [y_min, y_max] til subplot-området (invertert for skjerm)
-	double normalized = (y_scale * y - y_min) / (y_max - y_min);
-	int local_y = (int)((1.0 - normalized) * subplot_height);
+	float normalized = (y_scale * y - y_min) / (y_max - y_min);
+	int local_y = (int)((1.0f - normalized) * subplot_height);
 
 	return subplot_top + local_y;
 }
@@ -202,7 +196,7 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no)
 	int prev_y = -1;
 
 	move_playback_reset(&pb);
-	for (double t = T_START; t <= T_END; t += T_STEP) {
+	for (float t = T_START; t <= T_END; t += T_STEP) {
 		move_playback_tick(&pb, T_STEP);
 		move_evaluate(&move_lib[move_no], &pb, geom, &pose_graph_1);
 		move_evaluate(&move_lib[move_no_b], &pb, geom, &pose_graph_2);
@@ -225,7 +219,7 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no)
 int main(void)
 {
 	move_lib_init();
-	move_lib_randomize_range(20, 30, 0.5);
+	move_lib_randomize_range(20, 30, 0.5f);
 	move_playback_set_bpm(&pb, 150);
 	T = 1.0f / f0;
 
@@ -242,24 +236,24 @@ int main(void)
 
 	// ============ SETT OPP GRAFENE HER ============
 	struct Graph graphs[] = {
-		{ y0, 244, 67, 54, "g1" },  // Rød
-		{ y1, 244, 67, 54, "g2" },  // Rød
-		{ y2, 244, 67, 54, "g3" },  // Rød
-		{ y3, 244, 67, 54, "g4" },  // Rød
-		{ y4, 244, 67, 54, "g5" },  // Rød
-		{ y5, 244, 67, 54, "g6" },  // Rød
-		{ y6, 33, 150, 243, "g6" },  // Blå
-		{ y7, 33, 150, 243, "g6" },  // Blå
-		{ y8, 33, 150, 243, "g6" },  // Blå
-		{ y9, 33, 150, 243, "g6" },  // Blå
-		{ y10, 33, 150, 243, "g6" },  // Blå
-		{ y11, 33, 150, 243, "g6" },  // Blå
-		{ y12, 200, 200, 200, "mix" },	// Hvit - rx
-		{ y13, 200, 200, 200, "mix" },	// Hvit - ry
-		{ y14, 200, 200, 200, "mix" },	// Hvit - rz
-		{ y15, 200, 200, 200, "mix" },	// Hvit - tx
-		{ y16, 200, 200, 200, "mix" },	// Hvit - ty
-		{ y17, 200, 200, 200, "mix" }  // Hvit - tz
+		{ g1_rx, 244, 67, 54, "g1_rx" },  // Rød
+		{ g1_ry, 244, 67, 54, "g1_ry" },  // Rød
+		{ g1_rz, 244, 67, 54, "g1_rz" },  // Rød
+		{ g1_tx, 244, 67, 54, "g1_tx" },  // Rød
+		{ g1_ty, 244, 67, 54, "g1_ty" },  // Rød
+		{ g1_tz, 244, 67, 54, "g1_tz" },  // Rød
+		{ g2_rx, 33, 150, 243, "g2_rx" },  // Blå
+		{ g2_ry, 33, 150, 243, "g2_ry" },  // Blå
+		{ g2_rz, 33, 150, 243, "g2_rz" },  // Blå
+		{ g2_tx, 33, 150, 243, "g2_tx" },  // Blå
+		{ g2_ty, 33, 150, 243, "g2_ty" },  // Blå
+		{ g2_tz, 33, 150, 243, "g2_tz" },  // Blå
+		{ mix_rx, 200, 200, 200, "mix_rx" },  // Hvit
+		{ mix_ry, 200, 200, 200, "mix_ry" },  // Hvit
+		{ mix_rz, 200, 200, 200, "mix_rz" },  // Hvit
+		{ mix_tx, 200, 200, 200, "mix_tx" },  // Hvit
+		{ mix_ty, 200, 200, 200, "mix_ty" },  // Hvit
+		{ mix_tz, 200, 200, 200, "mix_tz" }   // Hvit
 	};
 
 	// Initialiser SDL
@@ -290,9 +284,15 @@ int main(void)
 	// Hovedløkke
 	bool running = true;
 	SDL_Event event;
+	Uint32 last_time = SDL_GetTicks();
+	Uint32 current_time;
+	float delta_time;
 
 	while (running) {
-		moving_phase = moving_phase + 0.001;
+		current_time = SDL_GetTicks();
+		delta_time = (current_time - last_time) / 1000.0f;
+		last_time = current_time;
+		moving_phase = moving_phase + 0.001f;
 		// Håndter events
 		while (SDL_PollEvent(&event)) {
 			switch (event.type) {
@@ -303,6 +303,10 @@ int main(void)
 				switch (event.key.keysym.sym) {
 				case SDLK_ESCAPE:
 					running = false;
+					break;
+				case SDLK_r:
+					t_is_running = 1;
+					t_current = 0.0f;
 					break;
 				case SDLK_UP:
 					move_no_b += (move_no_b < 98);
@@ -321,7 +325,7 @@ int main(void)
 					SDL_SetWindowTitle(window, str);
 					break;
 				case SDLK_LEFT:
-					t_current -= 0.04;
+					t_current -= 0.04f;
 					if (t_current < T_START)
 						t_current = T_START;
 					pb.t = t_current;
@@ -329,7 +333,7 @@ int main(void)
 					move_mixer.deck_b = move_no_b;
 					move_mixer.crossfader =
 						clampf(t_current - T_MIX_START,
-						       0.0, 1.0);
+						       0.0f, 1.0f);
 					move_evaluate_mixed(&move_mixer, &pb,
 							    geom, &pose_mix);
 					pose_mix.ty += geom->home_height;
@@ -343,7 +347,7 @@ int main(void)
 					SDL_SetWindowTitle(window, str);
 					break;
 				case SDLK_RIGHT:
-					t_current += 0.04;
+					t_current += 0.04f;
 					if (t_current > T_END)
 						t_current = T_END;
 					pb.t = t_current;
@@ -351,7 +355,7 @@ int main(void)
 					move_mixer.deck_b = move_no_b;
 					move_mixer.crossfader =
 						clampf(t_current - T_MIX_START,
-						       0.0, 1.0);
+						       0.0f, 1.0f);
 					move_evaluate_mixed(&move_mixer, &pb,
 							    geom, &pose_mix);
 					pose_mix.ty += geom->home_height;
@@ -385,6 +389,25 @@ int main(void)
 
 		SDL_RenderPresent(renderer);
 		SDL_Delay(16);	// ~60 FPS
+
+		if (t_is_running) {
+			pb.t = t_current;
+			move_mixer.deck_a = move_no;
+			move_mixer.deck_b = move_no_b;
+			move_mixer.crossfader =
+				clampf(t_current - T_MIX_START, 0.0f, 1.0f);
+			move_evaluate_mixed(&move_mixer, &pb, geom, &pose_mix);
+			pose_mix.ty += geom->home_height;
+			viz_sender_send_pose(viz_sock, &pose_mix,
+					     ROBOT_TYPE_MX64, 9002);
+			snprintf(str, sizeof(str),
+				 "Move %d/%d : t=%.2f xf=%.2f", move_no,
+				 move_no_b, t_current, move_mixer.crossfader);
+			SDL_SetWindowTitle(window, str);
+			t_current += delta_time;
+		}
+		if (t_current > T_END)
+			t_is_running = 0;
 	}
 
 	// Rydd opp
