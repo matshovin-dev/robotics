@@ -8,6 +8,7 @@
  */
 
 #include "move_lib.h"
+#include "fade_lib.h"
 #include "stewart/pose.h"
 #include "stewart/geometry.h"
 #include "viz_sender.h"
@@ -23,7 +24,7 @@ void draw_grid(SDL_Renderer *renderer);
 
 // Tidsintervall
 #define T_START 0.0f
-#define T_END 8.0f
+#define T_END 5.0f
 #define T_STEP 1.0f / 200.0f
 
 // Vindu-størrelse
@@ -59,9 +60,20 @@ int t_is_running = 0;
 char str[32]; /* div bruk */
 int viz_sock = -1;
 
-float t_mix_start = 3.0f;
-float t_mix_end = 4.0f;
+float t_mix_start = 0.0f;
+float t_mix_end = 0.0f;
 int bpm = 150;
+float t_inc_manual = 0.01f;
+
+// Fade-funksjon (kan byttes med tastatur)
+fade_func_t current_fade = fade_linear;
+int current_fade_index = 0;
+const char *fade_names[] = { "linear",    "smoothstep", "ease_in", "ease_out",
+			     "params",    "dip_home",   "via_pose", "hold_rot" };
+fade_func_t fade_funcs[] = { fade_linear,   fade_smoothstep, fade_ease_in,
+			     fade_ease_out, fade_params,     fade_dip_home,
+			     fade_via_pose, fade_hold_rot };
+#define NUM_FADES 8
 
 // Audio
 #define AUDIO_FREQ 44100
@@ -201,10 +213,9 @@ float get_crossfader(float t)
 void send_mixed_pose_at_time(float t)
 {
 	pb.t = t;
-	move_mixer.deck_a = move_no;
-	move_mixer.deck_b = move_no_b;
-	move_mixer.crossfader = get_crossfader(t);
-	move_evaluate_mixed(&move_mixer, &pb, geom, &pose_mix);
+	float cf = get_crossfader(t);
+	current_fade(&move_lib[move_no], &move_lib[move_no_b], cf, geom, &pb,
+		     &pose_mix);
 	pose_mix.ty += geom->home_height;
 	viz_sender_send_pose(viz_sock, &pose_mix, ROBOT_TYPE_MX64, 9002);
 }
@@ -248,10 +259,9 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 		move_playback_tick(&pb, T_STEP);
 		move_evaluate(&move_lib[move_no], &pb, geom, &pose_graph_1);
 		move_evaluate(&move_lib[move_no_b], &pb, geom, &pose_graph_2);
-		move_mixer.deck_a = move_no;
-		move_mixer.deck_b = move_no_b;
-		move_mixer.crossfader = get_crossfader(t);
-		move_evaluate_mixed(&move_mixer, &pb, geom, &pose_graph_mix);
+		float cf = get_crossfader(t);
+		current_fade(&move_lib[move_no], &move_lib[move_no_b], cf, geom,
+			     &pb, &pose_graph_mix);
 		int x = map_t_to_x(t);
 		int y = map_y_to_screen(graph->func(t), graph_no % 6);
 
@@ -273,13 +283,22 @@ int main(void)
 	float beat_duration = 60.0f / bpm;  // sekunder per beat
 	float bar_duration =
 		4.0f * beat_duration;  // sekunder per takt (4 beats)
-	t_mix_start = 2.0f * bar_duration;  // start ved takt 4
-	t_mix_end = t_mix_start + bar_duration;	 // varer én takt
+	t_mix_start = 1.0f * bar_duration;  // start ved takt 4
+	t_mix_end = t_mix_start + bar_duration / 2.0f;	// varer én takt
 
 	move_mixer.deck_a = move_no;
 	move_mixer.deck_b = move_no_b;
 	move_mixer.volume_a = 1.0f;
 	move_mixer.volume_b = 1.0f;
+
+	// Midtpose for fade_via_pose - hevet posisjon
+	fade_mid_pose.rx = 0.0f;
+	fade_mid_pose.ry = 0.0f;
+	fade_mid_pose.rz = 0.0f;
+	fade_mid_pose.tx = 0.0f;
+	fade_mid_pose.ty = 18.0f;  // Hevet 15mm
+	fade_mid_pose.tz = 0.0f;
+	fade_mid_hold = 0.2f;
 
 	// Opprett viz socket
 	viz_sock = viz_sender_create();
@@ -394,7 +413,7 @@ int main(void)
 					SDL_SetWindowTitle(window, str);
 					break;
 				case SDLK_LEFT:
-					t_current -= 0.04f;
+					t_current -= t_inc_manual;
 					if (t_current < T_START)
 						t_current = T_START;
 					send_mixed_pose_at_time(t_current);
@@ -405,7 +424,7 @@ int main(void)
 					SDL_SetWindowTitle(window, str);
 					break;
 				case SDLK_RIGHT:
-					t_current += 0.04f;
+					t_current += t_inc_manual;
 					if (t_current > T_END)
 						t_current = T_END;
 					send_mixed_pose_at_time(t_current);
@@ -415,8 +434,24 @@ int main(void)
 						 move_mixer.crossfader);
 					SDL_SetWindowTitle(window, str);
 					break;
-				case SDLK_k:
-					// ...
+				case SDLK_f:
+					// Bytt fade-funksjon
+					if (event.key.keysym.mod & KMOD_SHIFT)
+						current_fade_index =
+							(current_fade_index -
+							 1) %
+							NUM_FADES;
+					else
+						current_fade_index =
+							(current_fade_index +
+							 1) %
+							NUM_FADES;
+					current_fade =
+						fade_funcs[current_fade_index];
+					snprintf(
+						str, sizeof(str), "Fade: %s",
+						fade_names[current_fade_index]);
+					SDL_SetWindowTitle(window, str);
 					break;
 				}
 				break;
