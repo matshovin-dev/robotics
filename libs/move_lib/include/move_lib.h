@@ -17,6 +17,8 @@
 #ifndef MOVE_LIB_H
 #define MOVE_LIB_H
 
+#include "stewart/pose.h"  /* Required for move_spline struct */
+
 /*
  * Configuration
  */
@@ -101,9 +103,8 @@ extern struct move move_lib[MOVE_LIB_SIZE];
 extern struct move_mixer move_mixer;
 extern struct move_playback move_playback;
 
-/* Forward declarations for stewart types */
+/* Forward declaration for stewart geometry (full definition not needed) */
 struct stewart_geometry;
-struct stewart_pose;
 
 /*
  * Core evaluation functions
@@ -120,6 +121,27 @@ void move_evaluate(const struct move *m,
 		   const struct move_playback *pb,
 		   const struct stewart_geometry *geom,
 		   struct stewart_pose *out);
+
+/**
+ * move_evaluate_derivatives - Evaluate move with all derivatives
+ * @m: Pointer to move definition
+ * @pb: Pointer to playback state
+ * @geom: Pointer to robot geometry (for scaling limits)
+ * @pos: Output position (same as move_evaluate)
+ * @vel: Output velocity (d/dt)
+ * @acc: Output acceleration (d²/dt²)
+ * @jerk: Output jerk (d³/dt³)
+ *
+ * Analytically computes derivatives for spline matching (C0-C3 continuity).
+ * Units: pos in deg/mm, vel in deg/s or mm/s, acc in deg/s² or mm/s², etc.
+ */
+void move_evaluate_derivatives(const struct move *m,
+			       const struct move_playback *pb,
+			       const struct stewart_geometry *geom,
+			       struct stewart_pose *pos,
+			       struct stewart_pose *vel,
+			       struct stewart_pose *acc,
+			       struct stewart_pose *jerk);
 
 /**
  * move_evaluate_mixed - Evaluate mixer output (crossfade between two moves)
@@ -193,6 +215,153 @@ void move_interpolate(struct move *dst,
 		      const struct move *a,
 		      const struct move *b,
 		      float t);
+
+/**
+ * move_mirror - Speile utvalgte DOF-er (inverterer amplitude)
+ * @m: Move å modifisere (in-place)
+ * @dof_mask: Bitmask av DOF-er å speile (bruk DOF_RX, DOF_RY, etc.)
+ *
+ * Eksempel: move_mirror(m, (1<<DOF_RY) | (1<<DOF_RZ) | (1<<DOF_TX));
+ */
+void move_mirror(struct move *m, int dof_mask);
+
+/**
+ * move_phase_shift - Forskyv fase på utvalgte DOF-er
+ * @m: Move å modifisere (in-place)
+ * @dof_mask: Bitmask av DOF-er å endre
+ * @shift: Faseforskyvning (0.0-1.0, wraps)
+ */
+void move_phase_shift(struct move *m, int dof_mask, float shift);
+
+/**
+ * move_scale_amplitude - Skaler amplitude på utvalgte DOF-er
+ * @m: Move å modifisere (in-place)
+ * @dof_mask: Bitmask av DOF-er å endre
+ * @scale: Skaleringsfaktor (1.0 = uendret)
+ */
+void move_scale_amplitude(struct move *m, int dof_mask, float scale);
+
+/**
+ * move_swap_dofs - Bytt to DOF-er med hverandre
+ * @m: Move å modifisere (in-place)
+ * @dof_a: Første DOF
+ * @dof_b: Andre DOF
+ */
+void move_swap_dofs(struct move *m, int dof_a, int dof_b);
+
+/*
+ * Spline transitions - smooth interpolation between moves
+ *
+ * Continuity levels:
+ *   C0: Position matches at boundaries (linear blend, may have velocity jumps)
+ *   C1: Position + velocity match (cubic Hermite, smooth but acceleration jumps)
+ *   C2: Position + velocity + acceleration match (quintic, very smooth)
+ */
+
+/**
+ * Spline transition state - holds precomputed coefficients
+ */
+struct move_spline {
+	/* Start/end poses and derivatives (captured at transition start/end) */
+	struct stewart_pose p0, p1;   /* Positions */
+	struct stewart_pose v0, v1;   /* Velocities */
+	struct stewart_pose a0, a1;   /* Accelerations */
+
+	/* Transition timing */
+	float t_start;    /* When transition starts (seconds) */
+	float duration;   /* Transition duration (seconds) */
+
+	/* Which continuity level (0, 1, 2, or 3 for c0_ease) */
+	int continuity;
+
+	/* Ease parameters (for continuity=3, c0_ease) */
+	float ease_in;    /* 0.0-0.5: portion of transition with ease-in */
+	float ease_out;   /* 0.0-0.5: portion of transition with ease-out */
+};
+
+/**
+ * move_spline_init_c0 - Initialize C0 spline (position only)
+ * @spline: Output spline state
+ * @from: Source move
+ * @to: Target move
+ * @pb: Current playback state (captures t_start)
+ * @geom: Robot geometry
+ * @duration: Transition duration in seconds
+ */
+void move_spline_init_c0(struct move_spline *spline,
+			 const struct move *from,
+			 const struct move *to,
+			 const struct move_playback *pb,
+			 const struct stewart_geometry *geom,
+			 float duration);
+
+/**
+ * move_spline_init_c1 - Initialize C1 spline (position + velocity)
+ * @spline: Output spline state
+ * @from: Source move
+ * @to: Target move
+ * @pb: Current playback state
+ * @geom: Robot geometry
+ * @duration: Transition duration in seconds
+ */
+void move_spline_init_c1(struct move_spline *spline,
+			 const struct move *from,
+			 const struct move *to,
+			 const struct move_playback *pb,
+			 const struct stewart_geometry *geom,
+			 float duration);
+
+/**
+ * move_spline_init_c2 - Initialize C2 spline (position + velocity + acceleration)
+ * @spline: Output spline state
+ * @from: Source move
+ * @to: Target move
+ * @pb: Current playback state
+ * @geom: Robot geometry
+ * @duration: Transition duration in seconds
+ */
+void move_spline_init_c2(struct move_spline *spline,
+			 const struct move *from,
+			 const struct move *to,
+			 const struct move_playback *pb,
+			 const struct stewart_geometry *geom,
+			 float duration);
+
+/**
+ * move_spline_init_c0_ease - Initialize C0 spline with optional ease-in/out
+ * @spline: Output spline state
+ * @from: Source move
+ * @to: Target move
+ * @pb: Current playback state
+ * @geom: Robot geometry
+ * @duration: Transition duration in seconds
+ * @ease_in: Ease-in amount (0.0-0.5, e.g. 0.2 = 20% ease-in)
+ * @ease_out: Ease-out amount (0.0-0.5, e.g. 0.2 = 20% ease-out)
+ *
+ * Kombinerer lineær C0 med myk ease ved start/slutt.
+ * ease_in=0.2, ease_out=0.0 gir myk start, hard slutt.
+ */
+void move_spline_init_c0_ease(struct move_spline *spline,
+			      const struct move *from,
+			      const struct move *to,
+			      const struct move_playback *pb,
+			      const struct stewart_geometry *geom,
+			      float duration,
+			      float ease_in,
+			      float ease_out);
+
+/**
+ * move_spline_evaluate - Evaluate spline at current time
+ * @spline: Spline state (must be initialized)
+ * @pb: Current playback state
+ * @out: Output pose
+ *
+ * Returns 1 if still in transition, 0 if transition complete.
+ * When complete, out contains the target pose.
+ */
+int move_spline_evaluate(const struct move_spline *spline,
+			 const struct move_playback *pb,
+			 struct stewart_pose *out);
 
 /*
  * Serialization (for save/load)

@@ -65,15 +65,24 @@ float t_mix_end = 0.0f;
 int bpm = 150;
 float t_inc_manual = 0.01f;
 
+struct move_spline spline;
+int spline_active = 0;	// 1 = bruker spline, 0 = bruker fade
+int spline_initialized =
+	0;  // Har vi initialisert splinen for denne transisjonen?
+int current_spline_type = 0;  // 0=C0, 1=C1, 2=C2
+
 // Fade-funksjon (kan byttes med tastatur)
 fade_func_t current_fade = fade_linear;
 int current_fade_index = 0;
-const char *fade_names[] = { "linear",    "smoothstep", "ease_in", "ease_out",
-			     "params",    "dip_home",   "via_pose", "hold_rot" };
+const char *fade_names[] = { "linear", "smoothstep", "ease_in",	 "ease_out",
+			     "params", "dip_home",   "via_pose", "hold_rot" };
 fade_func_t fade_funcs[] = { fade_linear,   fade_smoothstep, fade_ease_in,
 			     fade_ease_out, fade_params,     fade_dip_home,
 			     fade_via_pose, fade_hold_rot };
 #define NUM_FADES 8
+
+const char *spline_names[] = { "C0", "C1", "C2" };
+#define NUM_SPLINES 3
 
 // Audio
 #define AUDIO_FREQ 44100
@@ -213,9 +222,49 @@ float get_crossfader(float t)
 void send_mixed_pose_at_time(float t)
 {
 	pb.t = t;
-	float cf = get_crossfader(t);
-	current_fade(&move_lib[move_no], &move_lib[move_no_b], cf, geom, &pb,
-		     &pose_mix);
+
+	if (spline_active) {
+		// Initialiser spline ved transisjon-start
+		if (!spline_initialized && t >= t_mix_start) {
+			float duration = t_mix_end - t_mix_start;
+			pb.t = t_mix_start;  // Sett playback til start
+			switch (current_spline_type) {
+			case 0:	 // C0
+				move_spline_init_c0(&spline, &move_lib[move_no],
+						    &move_lib[move_no_b], &pb,
+						    geom, duration);
+				break;
+			case 1:	 // C1
+				move_spline_init_c1(&spline, &move_lib[move_no],
+						    &move_lib[move_no_b], &pb,
+						    geom, duration);
+				break;
+			case 2:	 // C2
+				move_spline_init_c2(&spline, &move_lib[move_no],
+						    &move_lib[move_no_b], &pb,
+						    geom, duration);
+				break;
+			}
+			spline_initialized = 1;
+			pb.t = t;  // Tilbake til nåværende tid
+		}
+
+		// Evaluer spline eller bruk move direkte
+		if (t < t_mix_start) {
+			move_evaluate(&move_lib[move_no], &pb, geom, &pose_mix);
+		} else if (t > t_mix_end) {
+			move_evaluate(&move_lib[move_no_b], &pb, geom,
+				      &pose_mix);
+		} else {
+			move_spline_evaluate(&spline, &pb, &pose_mix);
+		}
+	} else {
+		// Vanlig fade-funksjon
+		float cf = get_crossfader(t);
+		current_fade(&move_lib[move_no], &move_lib[move_no_b], cf, geom,
+			     &pb, &pose_mix);
+	}
+
 	pose_mix.ty += geom->home_height;
 	viz_sender_send_pose(viz_sock, &pose_mix, ROBOT_TYPE_MX64, 9002);
 }
@@ -253,15 +302,65 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 	int prev_x = -1;
 	int prev_y = -1;
 
+	// For spline-plotting: lag lokal spline for denne grafen
+	struct move_spline graph_spline;
+	int graph_spline_initialized = 0;
+
 	move_playback_reset(&pb);
 	pb.t = t_start;
 	for (float t = t_start; t <= t_end; t += T_STEP) {
 		move_playback_tick(&pb, T_STEP);
 		move_evaluate(&move_lib[move_no], &pb, geom, &pose_graph_1);
 		move_evaluate(&move_lib[move_no_b], &pb, geom, &pose_graph_2);
-		float cf = get_crossfader(t);
-		current_fade(&move_lib[move_no], &move_lib[move_no_b], cf, geom,
-			     &pb, &pose_graph_mix);
+
+		// Mix pose - enten fade eller spline
+		if (spline_active) {
+			if (!graph_spline_initialized && t >= t_mix_start) {
+				float duration = t_mix_end - t_mix_start;
+				struct move_playback init_pb = pb;
+				init_pb.t = t_mix_start;
+				switch (current_spline_type) {
+				case 0:
+					move_spline_init_c0(
+						&graph_spline,
+						&move_lib[move_no],
+						&move_lib[move_no_b], &init_pb,
+						geom, duration);
+					break;
+				case 1:
+					move_spline_init_c1(
+						&graph_spline,
+						&move_lib[move_no],
+						&move_lib[move_no_b], &init_pb,
+						geom, duration);
+					break;
+				case 2:
+					move_spline_init_c2(
+						&graph_spline,
+						&move_lib[move_no],
+						&move_lib[move_no_b], &init_pb,
+						geom, duration);
+					break;
+				}
+				graph_spline_initialized = 1;
+			}
+
+			if (t < t_mix_start) {
+				move_evaluate(&move_lib[move_no], &pb, geom,
+					      &pose_graph_mix);
+			} else if (t > t_mix_end) {
+				move_evaluate(&move_lib[move_no_b], &pb, geom,
+					      &pose_graph_mix);
+			} else {
+				move_spline_evaluate(&graph_spline, &pb,
+						     &pose_graph_mix);
+			}
+		} else {
+			float cf = get_crossfader(t);
+			current_fade(&move_lib[move_no], &move_lib[move_no_b],
+				     cf, geom, &pb, &pose_graph_mix);
+		}
+
 		int x = map_t_to_x(t);
 		int y = map_y_to_screen(graph->func(t), graph_no % 6);
 
@@ -308,24 +407,24 @@ int main(void)
 
 	// ============ SETT OPP GRAFENE HER ============
 	struct Graph graphs[] = {
-		{ g1_rx, 244, 67, 54, "g1_rx" },  // Rød
-		{ g1_ry, 244, 67, 54, "g1_ry" },  // Rød
-		{ g1_rz, 244, 67, 54, "g1_rz" },  // Rød
-		{ g1_tx, 244, 67, 54, "g1_tx" },  // Rød
-		{ g1_ty, 244, 67, 54, "g1_ty" },  // Rød
-		{ g1_tz, 244, 67, 54, "g1_tz" },  // Rød
-		{ g2_rx, 33, 150, 243, "g2_rx" },  // Blå
-		{ g2_ry, 33, 150, 243, "g2_ry" },  // Blå
-		{ g2_rz, 33, 150, 243, "g2_rz" },  // Blå
-		{ g2_tx, 33, 150, 243, "g2_tx" },  // Blå
-		{ g2_ty, 33, 150, 243, "g2_ty" },  // Blå
-		{ g2_tz, 33, 150, 243, "g2_tz" },  // Blå
-		{ mix_rx, 200, 200, 200, "mix_rx" },  // Hvit
-		{ mix_ry, 200, 200, 200, "mix_ry" },  // Hvit
-		{ mix_rz, 200, 200, 200, "mix_rz" },  // Hvit
-		{ mix_tx, 200, 200, 200, "mix_tx" },  // Hvit
-		{ mix_ty, 200, 200, 200, "mix_ty" },  // Hvit
-		{ mix_tz, 200, 200, 200, "mix_tz" }  // Hvit
+		{ g1_rx, 244, 67, 54, "g1_rx" },  // Rød A
+		{ g1_ry, 244, 67, 54, "g1_ry" },  // Rød A
+		{ g1_rz, 244, 67, 54, "g1_rz" },  // Rød A
+		{ g1_tx, 244, 67, 54, "g1_tx" },  // Rød A
+		{ g1_ty, 244, 67, 54, "g1_ty" },  // Rød A
+		{ g1_tz, 244, 67, 54, "g1_tz" },  // Rød A
+		{ g2_rx, 33, 150, 243, "g2_rx" },  // Blå B
+		{ g2_ry, 33, 150, 243, "g2_ry" },  // Blå B
+		{ g2_rz, 33, 150, 243, "g2_rz" },  // Blå B
+		{ g2_tx, 33, 150, 243, "g2_tx" },  // Blå B
+		{ g2_ty, 33, 150, 243, "g2_ty" },  // Blå B
+		{ g2_tz, 33, 150, 243, "g2_tz" },  // Blå B
+		{ mix_rx, 200, 200, 200, "mix_rx" },  // Hvit MIX
+		{ mix_ry, 200, 200, 200, "mix_ry" },  // Hvit MIX
+		{ mix_rz, 200, 200, 200, "mix_rz" },  // Hvit MIX
+		{ mix_tx, 200, 200, 200, "mix_tx" },  // Hvit MIX
+		{ mix_ty, 200, 200, 200, "mix_ty" },  // Hvit MIX
+		{ mix_tz, 200, 200, 200, "mix_tz" }  // Hvit MIX
 	};
 
 	// Initialiser SDL
@@ -395,6 +494,7 @@ int main(void)
 				case SDLK_r:
 					t_is_running = 1;
 					t_current = 0.0f;
+					spline_initialized = 0;	 // Reset spline
 					break;
 				case SDLK_UP:
 					move_no_b += (move_no_b < 98);
@@ -439,7 +539,7 @@ int main(void)
 					if (event.key.keysym.mod & KMOD_SHIFT)
 						current_fade_index =
 							(current_fade_index -
-							 1) %
+							 1 + NUM_FADES) %
 							NUM_FADES;
 					else
 						current_fade_index =
@@ -448,9 +548,31 @@ int main(void)
 							NUM_FADES;
 					current_fade =
 						fade_funcs[current_fade_index];
+					spline_active =
+						0;  // Bytt til fade-modus
 					snprintf(
 						str, sizeof(str), "Fade: %s",
 						fade_names[current_fade_index]);
+					SDL_SetWindowTitle(window, str);
+					break;
+				case SDLK_s:
+					// Bytt spline-type
+					spline_active = 1;
+					if (event.key.keysym.mod & KMOD_SHIFT)
+						current_spline_type =
+							(current_spline_type -
+							 1 + NUM_SPLINES) %
+							NUM_SPLINES;
+					else
+						current_spline_type =
+							(current_spline_type +
+							 1) %
+							NUM_SPLINES;
+					spline_initialized =
+						0;  // Krever ny init
+					snprintf(str, sizeof(str), "Spline: %s",
+						 spline_names
+							 [current_spline_type]);
 					SDL_SetWindowTitle(window, str);
 					break;
 				}

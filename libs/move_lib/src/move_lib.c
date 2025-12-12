@@ -87,6 +87,59 @@ static float eval_dof(const struct move_dof *dof, float phase1, float phase05,
 }
 
 /*
+ * Evaluate DOF with derivatives
+ * For A*sin(ωt + φ):
+ *   pos = A*sin(ωt + φ)
+ *   vel = A*ω*cos(ωt + φ)
+ *   acc = -A*ω²*sin(ωt + φ)
+ *   jerk = -A*ω³*cos(ωt + φ)
+ */
+static void eval_dof_derivatives(const struct move_dof *dof,
+				 float phase1, float phase05, float phase025,
+				 float omega1, float omega05, float omega025,
+				 float max_amp, float max_bias,
+				 float *pos, float *vel, float *acc, float *jerk)
+{
+	*pos = 0.0f;
+	*vel = 0.0f;
+	*acc = 0.0f;
+	*jerk = 0.0f;
+
+	/* Harmonic 0: 1 beat (ω = omega1) */
+	float ph0 = phase1 + TWO_PI * dof->h[0].phase;
+	float A0 = max_amp * dof->h[0].amplitude;
+	float s0 = sinf(ph0);
+	float c0 = cosf(ph0);
+	*pos += A0 * s0;
+	*vel += A0 * omega1 * c0;
+	*acc += -A0 * omega1 * omega1 * s0;
+	*jerk += -A0 * omega1 * omega1 * omega1 * c0;
+
+	/* Harmonic 1: 1/2 beat (ω = omega05) */
+	float ph1 = phase05 + TWO_PI * dof->h[1].phase;
+	float A1 = max_amp * dof->h[1].amplitude;
+	float s1 = sinf(ph1);
+	float c1 = cosf(ph1);
+	*pos += A1 * s1;
+	*vel += A1 * omega05 * c1;
+	*acc += -A1 * omega05 * omega05 * s1;
+	*jerk += -A1 * omega05 * omega05 * omega05 * c1;
+
+	/* Harmonic 2: 1/4 beat (ω = omega025) */
+	float ph2 = phase025 + TWO_PI * dof->h[2].phase;
+	float A2 = max_amp * dof->h[2].amplitude;
+	float s2 = sinf(ph2);
+	float c2 = cosf(ph2);
+	*pos += A2 * s2;
+	*vel += A2 * omega025 * c2;
+	*acc += -A2 * omega025 * omega025 * s2;
+	*jerk += -A2 * omega025 * omega025 * omega025 * c2;
+
+	/* Bias only affects position (constant) */
+	*pos += max_bias * dof->bias;
+}
+
+/*
  * Core evaluation
  */
 void move_evaluate(const struct move *m, const struct move_playback *pb,
@@ -116,6 +169,59 @@ void move_evaluate(const struct move *m, const struct move_playback *pb,
 	out->tz = eval_dof(&m->dof[DOF_TZ], p1, p05, p025,
 			   geom->max_pose_translation_amplitude,
 			   geom->max_pose_translation_bias);
+}
+
+void move_evaluate_derivatives(const struct move *m,
+			       const struct move_playback *pb,
+			       const struct stewart_geometry *geom,
+			       struct stewart_pose *pos,
+			       struct stewart_pose *vel,
+			       struct stewart_pose *acc,
+			       struct stewart_pose *jerk)
+{
+	float p1 = move_phase_1(pb);
+	float p05 = move_phase_05(pb);
+	float p025 = move_phase_025(pb);
+
+	/* Angular frequencies: ω = 2π * f */
+	float beats_per_sec = pb->bpm / 60.0f;
+	float omega1 = TWO_PI * beats_per_sec;        /* 1 beat */
+	float omega05 = TWO_PI * beats_per_sec * 0.5f;  /* 1/2 beat */
+	float omega025 = TWO_PI * beats_per_sec * 0.25f; /* 1/4 beat */
+
+	/* Rotations */
+	eval_dof_derivatives(&m->dof[DOF_RX], p1, p05, p025,
+			     omega1, omega05, omega025,
+			     geom->max_pose_rotation_amplitude,
+			     geom->max_pose_rotation_bias,
+			     &pos->rx, &vel->rx, &acc->rx, &jerk->rx);
+	eval_dof_derivatives(&m->dof[DOF_RY], p1, p05, p025,
+			     omega1, omega05, omega025,
+			     geom->max_pose_rotation_amplitude,
+			     geom->max_pose_rotation_bias,
+			     &pos->ry, &vel->ry, &acc->ry, &jerk->ry);
+	eval_dof_derivatives(&m->dof[DOF_RZ], p1, p05, p025,
+			     omega1, omega05, omega025,
+			     geom->max_pose_rotation_amplitude,
+			     geom->max_pose_rotation_bias,
+			     &pos->rz, &vel->rz, &acc->rz, &jerk->rz);
+
+	/* Translations */
+	eval_dof_derivatives(&m->dof[DOF_TX], p1, p05, p025,
+			     omega1, omega05, omega025,
+			     geom->max_pose_translation_amplitude,
+			     geom->max_pose_translation_bias,
+			     &pos->tx, &vel->tx, &acc->tx, &jerk->tx);
+	eval_dof_derivatives(&m->dof[DOF_TY], p1, p05, p025,
+			     omega1, omega05, omega025,
+			     geom->max_pose_translation_amplitude,
+			     geom->max_pose_translation_bias,
+			     &pos->ty, &vel->ty, &acc->ty, &jerk->ty);
+	eval_dof_derivatives(&m->dof[DOF_TZ], p1, p05, p025,
+			     omega1, omega05, omega025,
+			     geom->max_pose_translation_amplitude,
+			     geom->max_pose_translation_bias,
+			     &pos->tz, &vel->tz, &acc->tz, &jerk->tz);
 }
 
 void move_evaluate_mixed(const struct move_mixer *mix,
@@ -237,6 +343,403 @@ void move_interpolate(struct move *dst, const struct move *a,
 		}
 		dst->dof[d].bias = inv_t * a->dof[d].bias + t * b->dof[d].bias;
 	}
+}
+
+void move_mirror(struct move *m, int dof_mask)
+{
+	for (int d = 0; d < MOVE_NUM_DOFS; d++) {
+		if (dof_mask & (1 << d)) {
+			for (int h = 0; h < MOVE_NUM_HARMONICS; h++) {
+				m->dof[d].h[h].amplitude =
+					-m->dof[d].h[h].amplitude;
+			}
+			m->dof[d].bias = -m->dof[d].bias;
+		}
+	}
+}
+
+void move_phase_shift(struct move *m, int dof_mask, float shift)
+{
+	for (int d = 0; d < MOVE_NUM_DOFS; d++) {
+		if (dof_mask & (1 << d)) {
+			for (int h = 0; h < MOVE_NUM_HARMONICS; h++) {
+				m->dof[d].h[h].phase += shift;
+				/* Wrap til [0, 1] */
+				while (m->dof[d].h[h].phase > 1.0f)
+					m->dof[d].h[h].phase -= 1.0f;
+				while (m->dof[d].h[h].phase < 0.0f)
+					m->dof[d].h[h].phase += 1.0f;
+			}
+		}
+	}
+}
+
+void move_scale_amplitude(struct move *m, int dof_mask, float scale)
+{
+	for (int d = 0; d < MOVE_NUM_DOFS; d++) {
+		if (dof_mask & (1 << d)) {
+			for (int h = 0; h < MOVE_NUM_HARMONICS; h++) {
+				m->dof[d].h[h].amplitude *= scale;
+			}
+			m->dof[d].bias *= scale;
+		}
+	}
+}
+
+void move_swap_dofs(struct move *m, int dof_a, int dof_b)
+{
+	if (dof_a < 0 || dof_a >= MOVE_NUM_DOFS)
+		return;
+	if (dof_b < 0 || dof_b >= MOVE_NUM_DOFS)
+		return;
+
+	struct move_dof tmp = m->dof[dof_a];
+	m->dof[dof_a] = m->dof[dof_b];
+	m->dof[dof_b] = tmp;
+}
+
+/*
+ * Spline transitions
+ *
+ * C0: Linear interpolation p(u) = (1-u)*p0 + u*p1
+ *
+ * C1: Cubic Hermite spline
+ *     p(u) = h00*p0 + h10*v0*T + h01*p1 + h11*v1*T
+ *     where T = duration, and basis functions are:
+ *     h00 = 2u³ - 3u² + 1
+ *     h10 = u³ - 2u² + u
+ *     h01 = -2u³ + 3u²
+ *     h11 = u³ - u²
+ *
+ * C2: Quintic Hermite spline (matches pos, vel, acc)
+ *     p(u) = a0 + a1*u + a2*u² + a3*u³ + a4*u⁴ + a5*u⁵
+ *     Coefficients derived from boundary conditions.
+ */
+
+/* Helper: capture target pose at future time */
+static void capture_target_derivatives(const struct move *m,
+				       const struct move_playback *pb,
+				       const struct stewart_geometry *geom,
+				       float t_offset,
+				       struct stewart_pose *pos,
+				       struct stewart_pose *vel,
+				       struct stewart_pose *acc)
+{
+	/* Create temporary playback at future time */
+	struct move_playback future_pb = *pb;
+	future_pb.t += t_offset;
+
+	struct stewart_pose jerk;  /* unused but required */
+	move_evaluate_derivatives(m, &future_pb, geom, pos, vel, acc, &jerk);
+}
+
+void move_spline_init_c0(struct move_spline *spline,
+			 const struct move *from,
+			 const struct move *to,
+			 const struct move_playback *pb,
+			 const struct stewart_geometry *geom,
+			 float duration)
+{
+	spline->t_start = pb->t;
+	spline->duration = duration;
+	spline->continuity = 0;
+
+	/* Capture current "from" position */
+	move_evaluate(from, pb, geom, &spline->p0);
+
+	/* Capture "to" position at end of transition */
+	struct move_playback end_pb = *pb;
+	end_pb.t += duration;
+	move_evaluate(to, &end_pb, geom, &spline->p1);
+
+	/* C0 doesn't use velocities/accelerations, but zero them for safety */
+	memset(&spline->v0, 0, sizeof(spline->v0));
+	memset(&spline->v1, 0, sizeof(spline->v1));
+	memset(&spline->a0, 0, sizeof(spline->a0));
+	memset(&spline->a1, 0, sizeof(spline->a1));
+}
+
+void move_spline_init_c1(struct move_spline *spline,
+			 const struct move *from,
+			 const struct move *to,
+			 const struct move_playback *pb,
+			 const struct stewart_geometry *geom,
+			 float duration)
+{
+	spline->t_start = pb->t;
+	spline->duration = duration;
+	spline->continuity = 1;
+
+	/* Capture current "from" position and velocity */
+	struct stewart_pose jerk;
+	move_evaluate_derivatives(from, pb, geom,
+				  &spline->p0, &spline->v0, &spline->a0, &jerk);
+
+	/* Capture "to" position and velocity at end of transition */
+	capture_target_derivatives(to, pb, geom, duration,
+				   &spline->p1, &spline->v1, &spline->a1);
+}
+
+void move_spline_init_c2(struct move_spline *spline,
+			 const struct move *from,
+			 const struct move *to,
+			 const struct move_playback *pb,
+			 const struct stewart_geometry *geom,
+			 float duration)
+{
+	spline->t_start = pb->t;
+	spline->duration = duration;
+	spline->continuity = 2;
+
+	/* Capture current "from" position, velocity, and acceleration */
+	struct stewart_pose jerk;
+	move_evaluate_derivatives(from, pb, geom,
+				  &spline->p0, &spline->v0, &spline->a0, &jerk);
+
+	/* Capture "to" at end of transition */
+	capture_target_derivatives(to, pb, geom, duration,
+				   &spline->p1, &spline->v1, &spline->a1);
+}
+
+void move_spline_init_c0_ease(struct move_spline *spline,
+			      const struct move *from,
+			      const struct move *to,
+			      const struct move_playback *pb,
+			      const struct stewart_geometry *geom,
+			      float duration,
+			      float ease_in,
+			      float ease_out)
+{
+	spline->t_start = pb->t;
+	spline->duration = duration;
+	spline->continuity = 3;  /* Special: c0 with ease */
+	spline->ease_in = (ease_in > 0.5f) ? 0.5f : ease_in;
+	spline->ease_out = (ease_out > 0.5f) ? 0.5f : ease_out;
+
+	/* Capture current "from" position */
+	move_evaluate(from, pb, geom, &spline->p0);
+
+	/* Capture "to" position at end of transition */
+	struct move_playback end_pb = *pb;
+	end_pb.t += duration;
+	move_evaluate(to, &end_pb, geom, &spline->p1);
+
+	/* Zero velocities/accelerations (not used) */
+	memset(&spline->v0, 0, sizeof(spline->v0));
+	memset(&spline->v1, 0, sizeof(spline->v1));
+	memset(&spline->a0, 0, sizeof(spline->a0));
+	memset(&spline->a1, 0, sizeof(spline->a1));
+}
+
+/* Evaluate single DOF with C0 (linear) */
+static float spline_eval_c0(float p0, float p1, float u)
+{
+	return (1.0f - u) * p0 + u * p1;
+}
+
+/*
+ * Apply ease-in/out to normalized time u
+ *
+ * Kubisk ease med C1 kontinuitet: starter/slutter med slope=0,
+ * matcher lineær slope=1 ved grensene.
+ *
+ * ease_in:  andel av starten med ease (0.0-0.5)
+ * ease_out: andel av slutten med ease (0.0-0.5)
+ */
+static float apply_ease(float u, float ease_in, float ease_out)
+{
+	if (ease_in <= 0.0f && ease_out <= 0.0f)
+		return u;  /* Ingen ease, ren lineær */
+
+	float lin_end = 1.0f - ease_out;
+	float t;
+
+	if (u <= 0.0f) {
+		t = 0.0f;
+	} else if (u >= 1.0f) {
+		t = 1.0f;
+	} else if (u < ease_in && ease_in > 0.0f) {
+		/*
+		 * Ease-in: kubisk kurve som starter med slope=0, ender med slope=1
+		 * Betingelser: t(0)=0, t'(0)=0, t(e)=e, t'(e)=1
+		 * Løsning: t = u²(2e - u) / e²
+		 */
+		float e = ease_in;
+		t = (u * u * (2.0f * e - u)) / (e * e);
+	} else if (u > lin_end && ease_out > 0.0f) {
+		/*
+		 * Ease-out: kubisk kurve som starter med slope=1, ender med slope=0
+		 * Speilet versjon av ease-in
+		 */
+		float one_minus_u = 1.0f - u;
+		float e = ease_out;
+		t = 1.0f - (one_minus_u * one_minus_u * (2.0f * e - one_minus_u)) / (e * e);
+	} else {
+		/* Lineær sone */
+		t = u;
+	}
+
+	return t;
+}
+
+/* Evaluate single DOF with C0 + ease */
+static float spline_eval_c0_ease(float p0, float p1, float u,
+				 float ease_in, float ease_out)
+{
+	float t = apply_ease(u, ease_in, ease_out);
+	return (1.0f - t) * p0 + t * p1;
+}
+
+/* Evaluate single DOF with C1 (cubic Hermite) */
+static float spline_eval_c1(float p0, float p1, float v0, float v1,
+			    float u, float T)
+{
+	float u2 = u * u;
+	float u3 = u2 * u;
+
+	/* Hermite basis functions */
+	float h00 = 2.0f * u3 - 3.0f * u2 + 1.0f;
+	float h10 = u3 - 2.0f * u2 + u;
+	float h01 = -2.0f * u3 + 3.0f * u2;
+	float h11 = u3 - u2;
+
+	return h00 * p0 + h10 * (v0 * T) + h01 * p1 + h11 * (v1 * T);
+}
+
+/* Evaluate single DOF with C2 (quintic) */
+static float spline_eval_c2(float p0, float p1,
+			    float v0, float v1,
+			    float a0, float a1,
+			    float u, float T)
+{
+	/*
+	 * Quintic polynomial: p(u) = sum(ai * u^i) for i=0..5
+	 *
+	 * Boundary conditions (in normalized time u = t/T):
+	 *   p(0) = p0,  p(1) = p1
+	 *   p'(0) = v0*T,  p'(1) = v1*T
+	 *   p''(0) = a0*T²,  p''(1) = a1*T²
+	 *
+	 * Solving gives:
+	 *   a0 = p0
+	 *   a1 = v0*T
+	 *   a2 = a0*T²/2
+	 *   a3 = 10*(p1-p0) - 6*v0*T - 4*v1*T - 1.5*a0*T² + 0.5*a1*T²
+	 *   a4 = -15*(p1-p0) + 8*v0*T + 7*v1*T + 1.5*a0*T² - a1*T²
+	 *   a5 = 6*(p1-p0) - 3*v0*T - 3*v1*T - 0.5*a0*T² + 0.5*a1*T²
+	 */
+	float T2 = T * T;
+	float dp = p1 - p0;
+	float v0T = v0 * T;
+	float v1T = v1 * T;
+	float a0T2 = a0 * T2;
+	float a1T2 = a1 * T2;
+
+	float c0 = p0;
+	float c1 = v0T;
+	float c2 = 0.5f * a0T2;
+	float c3 = 10.0f * dp - 6.0f * v0T - 4.0f * v1T - 1.5f * a0T2 + 0.5f * a1T2;
+	float c4 = -15.0f * dp + 8.0f * v0T + 7.0f * v1T + 1.5f * a0T2 - a1T2;
+	float c5 = 6.0f * dp - 3.0f * v0T - 3.0f * v1T - 0.5f * a0T2 + 0.5f * a1T2;
+
+	float u2 = u * u;
+	float u3 = u2 * u;
+	float u4 = u3 * u;
+	float u5 = u4 * u;
+
+	return c0 + c1 * u + c2 * u2 + c3 * u3 + c4 * u4 + c5 * u5;
+}
+
+int move_spline_evaluate(const struct move_spline *spline,
+			 const struct move_playback *pb,
+			 struct stewart_pose *out)
+{
+	float elapsed = pb->t - spline->t_start;
+
+	/* Before start: return start pose */
+	if (elapsed <= 0.0f) {
+		*out = spline->p0;
+		return 1;
+	}
+
+	/* After end: return end pose */
+	if (elapsed >= spline->duration) {
+		*out = spline->p1;
+		return 0;  /* Transition complete */
+	}
+
+	/* Normalized time u in [0, 1] */
+	float u = elapsed / spline->duration;
+	float T = spline->duration;
+
+	/* Evaluate based on continuity level */
+	switch (spline->continuity) {
+	case 0:  /* C0 - linear */
+		out->rx = spline_eval_c0(spline->p0.rx, spline->p1.rx, u);
+		out->ry = spline_eval_c0(spline->p0.ry, spline->p1.ry, u);
+		out->rz = spline_eval_c0(spline->p0.rz, spline->p1.rz, u);
+		out->tx = spline_eval_c0(spline->p0.tx, spline->p1.tx, u);
+		out->ty = spline_eval_c0(spline->p0.ty, spline->p1.ty, u);
+		out->tz = spline_eval_c0(spline->p0.tz, spline->p1.tz, u);
+		break;
+
+	case 1:  /* C1 - cubic Hermite */
+		out->rx = spline_eval_c1(spline->p0.rx, spline->p1.rx,
+					 spline->v0.rx, spline->v1.rx, u, T);
+		out->ry = spline_eval_c1(spline->p0.ry, spline->p1.ry,
+					 spline->v0.ry, spline->v1.ry, u, T);
+		out->rz = spline_eval_c1(spline->p0.rz, spline->p1.rz,
+					 spline->v0.rz, spline->v1.rz, u, T);
+		out->tx = spline_eval_c1(spline->p0.tx, spline->p1.tx,
+					 spline->v0.tx, spline->v1.tx, u, T);
+		out->ty = spline_eval_c1(spline->p0.ty, spline->p1.ty,
+					 spline->v0.ty, spline->v1.ty, u, T);
+		out->tz = spline_eval_c1(spline->p0.tz, spline->p1.tz,
+					 spline->v0.tz, spline->v1.tz, u, T);
+		break;
+
+	case 2:  /* C2 - quintic */
+		out->rx = spline_eval_c2(spline->p0.rx, spline->p1.rx,
+					 spline->v0.rx, spline->v1.rx,
+					 spline->a0.rx, spline->a1.rx, u, T);
+		out->ry = spline_eval_c2(spline->p0.ry, spline->p1.ry,
+					 spline->v0.ry, spline->v1.ry,
+					 spline->a0.ry, spline->a1.ry, u, T);
+		out->rz = spline_eval_c2(spline->p0.rz, spline->p1.rz,
+					 spline->v0.rz, spline->v1.rz,
+					 spline->a0.rz, spline->a1.rz, u, T);
+		out->tx = spline_eval_c2(spline->p0.tx, spline->p1.tx,
+					 spline->v0.tx, spline->v1.tx,
+					 spline->a0.tx, spline->a1.tx, u, T);
+		out->ty = spline_eval_c2(spline->p0.ty, spline->p1.ty,
+					 spline->v0.ty, spline->v1.ty,
+					 spline->a0.ty, spline->a1.ty, u, T);
+		out->tz = spline_eval_c2(spline->p0.tz, spline->p1.tz,
+					 spline->v0.tz, spline->v1.tz,
+					 spline->a0.tz, spline->a1.tz, u, T);
+		break;
+
+	case 3:  /* C0 with ease-in/out */
+		out->rx = spline_eval_c0_ease(spline->p0.rx, spline->p1.rx, u,
+					      spline->ease_in, spline->ease_out);
+		out->ry = spline_eval_c0_ease(spline->p0.ry, spline->p1.ry, u,
+					      spline->ease_in, spline->ease_out);
+		out->rz = spline_eval_c0_ease(spline->p0.rz, spline->p1.rz, u,
+					      spline->ease_in, spline->ease_out);
+		out->tx = spline_eval_c0_ease(spline->p0.tx, spline->p1.tx, u,
+					      spline->ease_in, spline->ease_out);
+		out->ty = spline_eval_c0_ease(spline->p0.ty, spline->p1.ty, u,
+					      spline->ease_in, spline->ease_out);
+		out->tz = spline_eval_c0_ease(spline->p0.tz, spline->p1.tz, u,
+					      spline->ease_in, spline->ease_out);
+		break;
+
+	default:
+		*out = spline->p0;  /* Fallback */
+		break;
+	}
+
+	return 1;  /* Still in transition */
 }
 
 /*
