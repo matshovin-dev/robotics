@@ -25,8 +25,6 @@ void draw_grid(SDL_Renderer *renderer);
 #define T_START 0.0f
 #define T_END 8.0f
 #define T_STEP 1.0f / 200.0f
-#define T_MIX_START 4.0f
-#define T_MIX_END 5.0f
 
 // Vindu-størrelse
 #define WIDTH 1200
@@ -60,6 +58,34 @@ float t_current = 1.0f;	 // sec
 int t_is_running = 0;
 char str[32]; /* div bruk */
 int viz_sock = -1;
+
+float t_mix_start = 3.0f;
+float t_mix_end = 4.0f;
+int bpm = 150;
+
+// Audio
+#define AUDIO_FREQ 44100
+#define AUDIO_SAMPLES 512
+int audio_playing = 0;
+float audio_phase = 0.0f;
+
+void audio_callback(void *userdata, Uint8 *stream, int len)
+{
+	float *buf = (float *)stream;
+	int samples = len / sizeof(float);
+	float freq = 200.0f;
+
+	for (int i = 0; i < samples; i++) {
+		if (audio_playing) {
+			buf[i] = 0.3f * sinf(audio_phase);
+			audio_phase += 2.0f * M_PI * freq / AUDIO_FREQ;
+			if (audio_phase > 2.0f * M_PI)
+				audio_phase -= 2.0f * M_PI;
+		} else {
+			buf[i] = 0.0f;
+		}
+	}
+}
 
 float g1_rx(float t)
 {
@@ -163,6 +189,26 @@ struct Graph {
 	const char *name;
 };
 
+float get_crossfader(float t)
+{
+	if (t < t_mix_start)
+		return 0.0f;
+	if (t > t_mix_end)
+		return 1.0f;
+	return (t - t_mix_start) / (t_mix_end - t_mix_start);
+}
+
+void send_mixed_pose_at_time(float t)
+{
+	pb.t = t;
+	move_mixer.deck_a = move_no;
+	move_mixer.deck_b = move_no_b;
+	move_mixer.crossfader = get_crossfader(t);
+	move_evaluate_mixed(&move_mixer, &pb, geom, &pose_mix);
+	pose_mix.ty += geom->home_height;
+	viz_sender_send_pose(viz_sock, &pose_mix, ROBOT_TYPE_MX64, 9002);
+}
+
 int map_t_to_x(float t)
 {
 	return (int)((t - T_START) / (T_END - T_START) * WIDTH);
@@ -186,7 +232,8 @@ int map_y_to_screen(float y, int subplot_no)
 	return subplot_top + local_y;
 }
 
-void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no)
+void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
+		float t_start, float t_end)
 {
 	// En graf av gangen - graph_no (sub plot nr)
 	// Denne kan også kalles flere gang med samme sub plotnr - overskrive
@@ -196,13 +243,14 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no)
 	int prev_y = -1;
 
 	move_playback_reset(&pb);
-	for (float t = T_START; t <= T_END; t += T_STEP) {
+	pb.t = t_start;
+	for (float t = t_start; t <= t_end; t += T_STEP) {
 		move_playback_tick(&pb, T_STEP);
 		move_evaluate(&move_lib[move_no], &pb, geom, &pose_graph_1);
 		move_evaluate(&move_lib[move_no_b], &pb, geom, &pose_graph_2);
 		move_mixer.deck_a = move_no;
 		move_mixer.deck_b = move_no_b;
-		move_mixer.crossfader = clampf(t - T_MIX_START, 0.0, 1.0);
+		move_mixer.crossfader = get_crossfader(t);
 		move_evaluate_mixed(&move_mixer, &pb, geom, &pose_graph_mix);
 		int x = map_t_to_x(t);
 		int y = map_y_to_screen(graph->func(t), graph_no % 6);
@@ -220,8 +268,13 @@ int main(void)
 {
 	move_lib_init();
 	move_lib_randomize_range(20, 30, 0.5f);
-	move_playback_set_bpm(&pb, 150);
+	move_playback_set_bpm(&pb, bpm);
 	T = 1.0f / f0;
+	float beat_duration = 60.0f / bpm;  // sekunder per beat
+	float bar_duration =
+		4.0f * beat_duration;  // sekunder per takt (4 beats)
+	t_mix_start = 2.0f * bar_duration;  // start ved takt 4
+	t_mix_end = t_mix_start + bar_duration;	 // varer én takt
 
 	move_mixer.deck_a = move_no;
 	move_mixer.deck_b = move_no_b;
@@ -253,13 +306,29 @@ int main(void)
 		{ mix_rz, 200, 200, 200, "mix_rz" },  // Hvit
 		{ mix_tx, 200, 200, 200, "mix_tx" },  // Hvit
 		{ mix_ty, 200, 200, 200, "mix_ty" },  // Hvit
-		{ mix_tz, 200, 200, 200, "mix_tz" }   // Hvit
+		{ mix_tz, 200, 200, 200, "mix_tz" }  // Hvit
 	};
 
 	// Initialiser SDL
-	if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
 		printf("SDL init feilet: %s\n", SDL_GetError());
 		return 1;
+	}
+
+	// Sett opp audio
+	SDL_AudioSpec want, have;
+	SDL_AudioDeviceID audio_dev;
+	SDL_memset(&want, 0, sizeof(want));
+	want.freq = AUDIO_FREQ;
+	want.format = AUDIO_F32;
+	want.channels = 1;
+	want.samples = AUDIO_SAMPLES;
+	want.callback = audio_callback;
+	audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+	if (audio_dev == 0) {
+		printf("Advarsel: Kunne ikke åpne audio: %s\n", SDL_GetError());
+	} else {
+		SDL_PauseAudioDevice(audio_dev, 0);  // Start audio
 	}
 
 	SDL_Window *window = SDL_CreateWindow(
@@ -328,18 +397,7 @@ int main(void)
 					t_current -= 0.04f;
 					if (t_current < T_START)
 						t_current = T_START;
-					pb.t = t_current;
-					move_mixer.deck_a = move_no;
-					move_mixer.deck_b = move_no_b;
-					move_mixer.crossfader =
-						clampf(t_current - T_MIX_START,
-						       0.0f, 1.0f);
-					move_evaluate_mixed(&move_mixer, &pb,
-							    geom, &pose_mix);
-					pose_mix.ty += geom->home_height;
-					viz_sender_send_pose(
-						viz_sock, &pose_mix,
-						ROBOT_TYPE_MX64, 9002);
+					send_mixed_pose_at_time(t_current);
 					snprintf(str, sizeof(str),
 						 "Move %d/%d : t=%.2f xf=%.2f",
 						 move_no, move_no_b, t_current,
@@ -350,18 +408,7 @@ int main(void)
 					t_current += 0.04f;
 					if (t_current > T_END)
 						t_current = T_END;
-					pb.t = t_current;
-					move_mixer.deck_a = move_no;
-					move_mixer.deck_b = move_no_b;
-					move_mixer.crossfader =
-						clampf(t_current - T_MIX_START,
-						       0.0f, 1.0f);
-					move_evaluate_mixed(&move_mixer, &pb,
-							    geom, &pose_mix);
-					pose_mix.ty += geom->home_height;
-					viz_sender_send_pose(
-						viz_sock, &pose_mix,
-						ROBOT_TYPE_MX64, 9002);
+					send_mixed_pose_at_time(t_current);
 					snprintf(str, sizeof(str),
 						 "Move %d/%d : t=%.2f xf=%.2f",
 						 move_no, move_no_b, t_current,
@@ -384,33 +431,36 @@ int main(void)
 		draw_grid(renderer);
 
 		for (int i = 0; i < NO_OF_SUBPLOTS * 3; i++) {
-			draw_graph(renderer, &graphs[i], i);
+			if (i > 11)
+				draw_graph(renderer, &graphs[i], i, t_mix_start,
+					   t_mix_end);
+			else
+				draw_graph(renderer, &graphs[i], i, T_START,
+					   T_END);
 		}
 
 		SDL_RenderPresent(renderer);
 		SDL_Delay(16);	// ~60 FPS
 
 		if (t_is_running) {
-			pb.t = t_current;
-			move_mixer.deck_a = move_no;
-			move_mixer.deck_b = move_no_b;
-			move_mixer.crossfader =
-				clampf(t_current - T_MIX_START, 0.0f, 1.0f);
-			move_evaluate_mixed(&move_mixer, &pb, geom, &pose_mix);
-			pose_mix.ty += geom->home_height;
-			viz_sender_send_pose(viz_sock, &pose_mix,
-					     ROBOT_TYPE_MX64, 9002);
+			send_mixed_pose_at_time(t_current);
+			audio_playing = (t_current >= t_mix_start &&
+					 t_current <= t_mix_end);
 			snprintf(str, sizeof(str),
 				 "Move %d/%d : t=%.2f xf=%.2f", move_no,
 				 move_no_b, t_current, move_mixer.crossfader);
 			SDL_SetWindowTitle(window, str);
 			t_current += delta_time;
+		} else {
+			audio_playing = 0;
 		}
 		if (t_current > T_END)
 			t_is_running = 0;
 	}
 
 	// Rydd opp
+	if (audio_dev != 0)
+		SDL_CloseAudioDevice(audio_dev);
 	if (viz_sock >= 0)
 		close(viz_sock);
 	SDL_DestroyRenderer(renderer);
@@ -426,12 +476,13 @@ void draw_grid(SDL_Renderer *renderer)
 {
 	SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);  // Mørk grå grid
 
-	// Vertikale linjer (t-aksen)
+	// Vertikale linjer for hver beat
+	float beat_duration = 60.0f / bpm;
 	float t = 0.0f;
 	while (t < T_END) {
 		int x = map_t_to_x(t);
 		SDL_RenderDrawLine(renderer, x, 0, x, HEIGHT);
-		t = t + T;
+		t = t + beat_duration;
 	}
 
 	// Horisontal y=0 linje for hver subplot
