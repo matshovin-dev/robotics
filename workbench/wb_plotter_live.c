@@ -36,8 +36,6 @@ void draw_grid(SDL_Renderer *renderer);
 #define SUBPLOT_Y_OFFSET 3.5f
 #define NO_OF_GRAPHS 7
 
-/* @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ */
-
 float f0 = 124.0f / 60.0f;
 float ph = 2.0f * M_PI * (3.0f / 4.0f);
 float T;
@@ -91,7 +89,9 @@ const char *spline_names[] = {
 };
 #define NUM_SPLINES 8
 
-// Audio
+/*
+ * Audio for lang beep under transisjon
+ */
 #define AUDIO_FREQ 44100
 #define AUDIO_SAMPLES 512
 int audio_playing = 0;
@@ -115,6 +115,11 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
 	}
 }
 
+/*
+ * 6 grafer for plotting av RX RY RZ TX TY TZ
+ * DECK A
+ * RØDE
+ */
 float g1_rx(float t)
 {
 	return pose_graph_1.rx;
@@ -145,7 +150,11 @@ float g1_tz(float t)
 	return pose_graph_1.tz;
 }
 
-/* neste move */
+/*
+ * 6 grafer for plotting av RX RY RZ TX TY TZ
+ * DECK B
+ * BLÅ
+ */
 
 float g2_rx(float t)
 {
@@ -177,7 +186,11 @@ float g2_tz(float t)
 	return pose_graph_2.tz;
 }
 
-/* mixer ut */
+/*
+ * 6 grafer for plotting av RX RY RZ TX TY TZ
+ * MIX DECK A/B, samt splines
+ * Disse plottes hvite kun i transisjons området
+ */
 
 float mix_rx(float t)
 {
@@ -209,15 +222,16 @@ float mix_tz(float t)
 	return pose_graph_mix.tz;
 }
 
-/* @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ */
-
 struct Graph {
-	float (*func)(float);
+	float (*func)(float); /* Funksjonene over med farge og navn */
 	Uint8 r, g, b;
 	const char *name;
 };
 
-/* ret: index 0 - 1 */
+/*
+ * Mixer
+ * Ret: 0.0f - 1.0f
+ */
 float get_crossfader(float t)
 {
 	if (t < t_mix_start)
@@ -430,10 +444,9 @@ static int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
 	else
 		SDL_PauseAudioDevice(*audio_dev, 0);
 
-	*window = SDL_CreateWindow("wb_plotter - y(t) Graf",
-				   SDL_WINDOWPOS_CENTERED,
-				   SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT,
-				   SDL_WINDOW_SHOWN);
+	*window = SDL_CreateWindow(
+		"wb_plotter - y(t) Graf", SDL_WINDOWPOS_CENTERED,
+		SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
 	if (!*window) {
 		printf("Vindu-opprettelse feilet: %s\n", SDL_GetError());
 		SDL_Quit();
@@ -477,15 +490,15 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 	case SDLK_UP:
 		move_no_b += (move_no_b < 98);
 		move_mixer.deck_b = move_no_b;
-		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f",
-			 move_no, move_no_b, t_current);
+		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f", move_no,
+			 move_no_b, t_current);
 		SDL_SetWindowTitle(window, str);
 		break;
 	case SDLK_DOWN:
 		move_no_b -= (move_no_b > 0);
 		move_mixer.deck_b = move_no_b;
-		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f",
-			 move_no, move_no_b, t_current);
+		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f", move_no,
+			 move_no_b, t_current);
 		SDL_SetWindowTitle(window, str);
 		break;
 	case SDLK_LEFT:
@@ -508,22 +521,30 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		break;
 	case SDLK_f:
 		if (key.mod & KMOD_SHIFT)
-			current_fade_index = (current_fade_index - 1 + NUM_FADES) % NUM_FADES;
+			current_fade_index =
+				(current_fade_index - 1 + NUM_FADES) %
+				NUM_FADES;
 		else
-			current_fade_index = (current_fade_index + 1) % NUM_FADES;
+			current_fade_index =
+				(current_fade_index + 1) % NUM_FADES;
 		current_fade = fade_funcs[current_fade_index];
 		spline_active = 0;
-		snprintf(str, sizeof(str), "Fade: %s", fade_names[current_fade_index]);
+		snprintf(str, sizeof(str), "Fade: %s",
+			 fade_names[current_fade_index]);
 		SDL_SetWindowTitle(window, str);
 		break;
 	case SDLK_s:
 		spline_active = 1;
 		if (key.mod & KMOD_SHIFT)
-			current_spline_type = (current_spline_type - 1 + NUM_SPLINES) % NUM_SPLINES;
+			current_spline_type =
+				(current_spline_type - 1 + NUM_SPLINES) %
+				NUM_SPLINES;
 		else
-			current_spline_type = (current_spline_type + 1) % NUM_SPLINES;
+			current_spline_type =
+				(current_spline_type + 1) % NUM_SPLINES;
 		spline_initialized = 0;
-		snprintf(str, sizeof(str), "Spline: %s", spline_names[current_spline_type]);
+		snprintf(str, sizeof(str), "Spline: %s",
+			 spline_names[current_spline_type]);
 		SDL_SetWindowTitle(window, str);
 		break;
 	}
@@ -552,7 +573,8 @@ static void render_frame(SDL_Renderer *renderer, struct Graph *graphs)
 
 	for (int i = 0; i < NO_OF_SUBPLOTS * 3; i++) {
 		if (i > 11)
-			draw_graph(renderer, &graphs[i], i, t_mix_start, t_mix_end);
+			draw_graph(renderer, &graphs[i], i, t_mix_start,
+				   t_mix_end);
 		else
 			draw_graph(renderer, &graphs[i], i, T_START, T_END);
 	}
@@ -569,8 +591,8 @@ static void update_playback(float delta_time, SDL_Window *window)
 
 	send_mixed_pose_at_time(t_current);
 	audio_playing = (t_current >= t_mix_start && t_current <= t_mix_end);
-	snprintf(str, sizeof(str), "Move %d/%d : t=%.2f xf=%.2f",
-		 move_no, move_no_b, t_current, move_mixer.crossfader);
+	snprintf(str, sizeof(str), "Move %d/%d : t=%.2f xf=%.2f", move_no,
+		 move_no_b, t_current, move_mixer.crossfader);
 	SDL_SetWindowTitle(window, str);
 	t_current += delta_time;
 
@@ -582,26 +604,24 @@ int main(void)
 {
 	init_move_system();
 
-	struct Graph graphs[] = {
-		{ g1_rx, 244, 67, 54, "g1_rx" },
-		{ g1_ry, 244, 67, 54, "g1_ry" },
-		{ g1_rz, 244, 67, 54, "g1_rz" },
-		{ g1_tx, 244, 67, 54, "g1_tx" },
-		{ g1_ty, 244, 67, 54, "g1_ty" },
-		{ g1_tz, 244, 67, 54, "g1_tz" },
-		{ g2_rx, 33, 150, 243, "g2_rx" },
-		{ g2_ry, 33, 150, 243, "g2_ry" },
-		{ g2_rz, 33, 150, 243, "g2_rz" },
-		{ g2_tx, 33, 150, 243, "g2_tx" },
-		{ g2_ty, 33, 150, 243, "g2_ty" },
-		{ g2_tz, 33, 150, 243, "g2_tz" },
-		{ mix_rx, 200, 200, 200, "mix_rx" },
-		{ mix_ry, 200, 200, 200, "mix_ry" },
-		{ mix_rz, 200, 200, 200, "mix_rz" },
-		{ mix_tx, 200, 200, 200, "mix_tx" },
-		{ mix_ty, 200, 200, 200, "mix_ty" },
-		{ mix_tz, 200, 200, 200, "mix_tz" }
-	};
+	struct Graph graphs[] = { { g1_rx, 244, 67, 54, "g1_rx" },
+				  { g1_ry, 244, 67, 54, "g1_ry" },
+				  { g1_rz, 244, 67, 54, "g1_rz" },
+				  { g1_tx, 244, 67, 54, "g1_tx" },
+				  { g1_ty, 244, 67, 54, "g1_ty" },
+				  { g1_tz, 244, 67, 54, "g1_tz" },
+				  { g2_rx, 33, 150, 243, "g2_rx" },
+				  { g2_ry, 33, 150, 243, "g2_ry" },
+				  { g2_rz, 33, 150, 243, "g2_rz" },
+				  { g2_tx, 33, 150, 243, "g2_tx" },
+				  { g2_ty, 33, 150, 243, "g2_ty" },
+				  { g2_tz, 33, 150, 243, "g2_tz" },
+				  { mix_rx, 200, 200, 200, "mix_rx" },
+				  { mix_ry, 200, 200, 200, "mix_ry" },
+				  { mix_rz, 200, 200, 200, "mix_rz" },
+				  { mix_tx, 200, 200, 200, "mix_tx" },
+				  { mix_ty, 200, 200, 200, "mix_ty" },
+				  { mix_tz, 200, 200, 200, "mix_tz" } };
 
 	SDL_Window *window;
 	SDL_Renderer *renderer;

@@ -1,6 +1,7 @@
 CC = gcc
 CFLAGS = -Wall -Wextra -std=c11 -O2 \
 	-I ../libs/move_lib/include \
+	-I ../libs/fade_lib/include \
 	-I ../libs/input/include \
 	-I ../libs/math/include \
 	-I ../libs/song_lib/include \
@@ -58,10 +59,10 @@ wb_plotter: wb_plotter.c
 
 CJSON = ../libs/song_lib/build/cJSON.o
 
-FADE_LIB = fade_lib.c
+FADE_LIB = ../libs/fade_lib/src/fade_lib.c
 
 wb_plotter_live: wb_plotter_live.c $(FADE_LIB) $(MOVE_LIB) $(CJSON) $(STEWART_GEOM) $(MATH_UTILS)
-	$(CC) -Wall -std=c11 -O2 -I ../libs/move_lib/include -I ../platforms/stewart/include -I ../libs/math/include -I ../viz-modules/common/include $< $(FADE_LIB) $(MOVE_LIB) $(CJSON) $(STEWART_GEOM) $(MATH_UTILS) $(VIZ_COMMON) -o $@ -lm $(shell sdl2-config --cflags --libs)
+	$(CC) -Wall -std=c11 -O2 -I ../libs/move_lib/include -I ../libs/fade_lib/include -I ../platforms/stewart/include -I ../libs/math/include -I ../viz-modules/common/include $< $(FADE_LIB) $(MOVE_LIB) $(CJSON) $(STEWART_GEOM) $(MATH_UTILS) $(VIZ_COMMON) -o $@ -lm $(shell sdl2-config --cflags --libs)
 
 clean:
 	rm -f wb_move_test wb_mixer_test wb_input_test wb_coreo_player wb_plotter wb_plotter_live
