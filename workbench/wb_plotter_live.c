@@ -81,8 +81,15 @@ fade_func_t fade_funcs[] = { fade_linear,   fade_smoothstep, fade_ease_in,
 			     fade_via_pose, fade_hold_rot };
 #define NUM_FADES 8
 
-const char *spline_names[] = { "C0", "C1", "C2" };
-#define NUM_SPLINES 3
+const char *spline_names[] = {
+	"C0 (linear)",	"C1 (Hermite)",
+	"C2 (quintic)", "Cardinal 0.0", /* tension=0, like C1 */
+	"Cardinal 0.5", /* tension=0.5, moderate */
+	"Cardinal 0.8", /* tension=0.8, tight */
+	"Monotonic", /* no overshoot */
+	"B-spline" /* smooth approximation */
+};
+#define NUM_SPLINES 8
 
 // Audio
 #define AUDIO_FREQ 44100
@@ -210,6 +217,7 @@ struct Graph {
 	const char *name;
 };
 
+/* ret: index 0 - 1 */
 float get_crossfader(float t)
 {
 	if (t < t_mix_start)
@@ -219,52 +227,73 @@ float get_crossfader(float t)
 	return (t - t_mix_start) / (t_mix_end - t_mix_start);
 }
 
+static void init_spline_by_type(struct move_spline *sp, int type,
+				struct move *move_a, struct move *move_b,
+				struct move_playback *playback,
+				struct stewart_geometry *g, float duration)
+{
+	switch (type) {
+	case 0:
+		move_spline_init_c0(sp, move_a, move_b, playback, g, duration);
+		break;
+	case 1:
+		move_spline_init_c1(sp, move_a, move_b, playback, g, duration);
+		break;
+	case 2:
+		move_spline_init_c2(sp, move_a, move_b, playback, g, duration);
+		break;
+	case 3:
+		move_spline_init_cardinal(sp, move_a, move_b, playback, g,
+					  duration, 0.0f);
+		break;
+	case 4:
+		move_spline_init_cardinal(sp, move_a, move_b, playback, g,
+					  duration, 0.5f);
+		break;
+	case 5:
+		move_spline_init_cardinal(sp, move_a, move_b, playback, g,
+					  duration, 0.8f);
+		break;
+	case 6:
+		move_spline_init_monotonic(sp, move_a, move_b, playback, g,
+					   duration);
+		break;
+	case 7:
+		move_spline_init_bspline(sp, move_a, move_b, playback, g,
+					 duration);
+		break;
+	}
+}
+
 void send_mixed_pose_at_time(float t)
 {
 	pb.t = t;
 
-	if (spline_active) {
-		// Initialiser spline ved transisjon-start
-		if (!spline_initialized && t >= t_mix_start) {
-			float duration = t_mix_end - t_mix_start;
-			pb.t = t_mix_start;  // Sett playback til start
-			switch (current_spline_type) {
-			case 0:	 // C0
-				move_spline_init_c0(&spline, &move_lib[move_no],
-						    &move_lib[move_no_b], &pb,
-						    geom, duration);
-				break;
-			case 1:	 // C1
-				move_spline_init_c1(&spline, &move_lib[move_no],
-						    &move_lib[move_no_b], &pb,
-						    geom, duration);
-				break;
-			case 2:	 // C2
-				move_spline_init_c2(&spline, &move_lib[move_no],
-						    &move_lib[move_no_b], &pb,
-						    geom, duration);
-				break;
-			}
-			spline_initialized = 1;
-			pb.t = t;  // Tilbake til nåværende tid
-		}
-
-		// Evaluer spline eller bruk move direkte
-		if (t < t_mix_start) {
-			move_evaluate(&move_lib[move_no], &pb, geom, &pose_mix);
-		} else if (t > t_mix_end) {
-			move_evaluate(&move_lib[move_no_b], &pb, geom,
-				      &pose_mix);
-		} else {
-			move_spline_evaluate(&spline, &pb, &pose_mix);
-		}
-	} else {
-		// Vanlig fade-funksjon
+	if (!spline_active) {
 		float cf = get_crossfader(t);
 		current_fade(&move_lib[move_no], &move_lib[move_no_b], cf, geom,
 			     &pb, &pose_mix);
+		goto send;
 	}
 
+	if (!spline_initialized && t >= t_mix_start) {
+		float duration = t_mix_end - t_mix_start;
+		pb.t = t_mix_start;
+		init_spline_by_type(&spline, current_spline_type,
+				    &move_lib[move_no], &move_lib[move_no_b],
+				    &pb, geom, duration);
+		spline_initialized = 1;
+		pb.t = t;
+	}
+
+	if (t < t_mix_start)
+		move_evaluate(&move_lib[move_no], &pb, geom, &pose_mix);
+	else if (t > t_mix_end)
+		move_evaluate(&move_lib[move_no_b], &pb, geom, &pose_mix);
+	else
+		move_spline_evaluate(&spline, &pb, &pose_mix);
+
+send:
 	pose_mix.ty += geom->home_height;
 	viz_sender_send_pose(viz_sock, &pose_mix, ROBOT_TYPE_MX64, 9002);
 }
@@ -295,327 +324,136 @@ int map_y_to_screen(float y, int subplot_no)
 void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 		float t_start, float t_end)
 {
-	// En graf av gangen - graph_no (sub plot nr)
-	// Denne kan også kalles flere gang med samme sub plotnr - overskrive
 	SDL_SetRenderDrawColor(renderer, graph->r, graph->g, graph->b, 255);
 
 	int prev_x = -1;
 	int prev_y = -1;
-
-	// For spline-plotting: lag lokal spline for denne grafen
 	struct move_spline graph_spline;
 	int graph_spline_initialized = 0;
 
 	move_playback_reset(&pb);
 	pb.t = t_start;
+
 	for (float t = t_start; t <= t_end; t += T_STEP) {
 		move_playback_tick(&pb, T_STEP);
 		move_evaluate(&move_lib[move_no], &pb, geom, &pose_graph_1);
 		move_evaluate(&move_lib[move_no_b], &pb, geom, &pose_graph_2);
 
-		// Mix pose - enten fade eller spline
-		if (spline_active) {
-			if (!graph_spline_initialized && t >= t_mix_start) {
-				float duration = t_mix_end - t_mix_start;
-				struct move_playback init_pb = pb;
-				init_pb.t = t_mix_start;
-				switch (current_spline_type) {
-				case 0:
-					move_spline_init_c0(
-						&graph_spline,
-						&move_lib[move_no],
-						&move_lib[move_no_b], &init_pb,
-						geom, duration);
-					break;
-				case 1:
-					move_spline_init_c1(
-						&graph_spline,
-						&move_lib[move_no],
-						&move_lib[move_no_b], &init_pb,
-						geom, duration);
-					break;
-				case 2:
-					move_spline_init_c2(
-						&graph_spline,
-						&move_lib[move_no],
-						&move_lib[move_no_b], &init_pb,
-						geom, duration);
-					break;
-				}
-				graph_spline_initialized = 1;
-			}
-
-			if (t < t_mix_start) {
-				move_evaluate(&move_lib[move_no], &pb, geom,
-					      &pose_graph_mix);
-			} else if (t > t_mix_end) {
-				move_evaluate(&move_lib[move_no_b], &pb, geom,
-					      &pose_graph_mix);
-			} else {
-				move_spline_evaluate(&graph_spline, &pb,
-						     &pose_graph_mix);
-			}
-		} else {
+		if (!spline_active) {
 			float cf = get_crossfader(t);
 			current_fade(&move_lib[move_no], &move_lib[move_no_b],
 				     cf, geom, &pb, &pose_graph_mix);
+			goto draw;
 		}
 
+		if (!graph_spline_initialized && t >= t_mix_start) {
+			float duration = t_mix_end - t_mix_start;
+			struct move_playback init_pb = pb;
+			init_pb.t = t_mix_start;
+			init_spline_by_type(&graph_spline, current_spline_type,
+					    &move_lib[move_no],
+					    &move_lib[move_no_b], &init_pb,
+					    geom, duration);
+			graph_spline_initialized = 1;
+		}
+
+		if (t < t_mix_start)
+			move_evaluate(&move_lib[move_no], &pb, geom,
+				      &pose_graph_mix);
+		else if (t > t_mix_end)
+			move_evaluate(&move_lib[move_no_b], &pb, geom,
+				      &pose_graph_mix);
+		else
+			move_spline_evaluate(&graph_spline, &pb,
+					     &pose_graph_mix);
+
+	draw:
 		int x = map_t_to_x(t);
 		int y = map_y_to_screen(graph->func(t), graph_no % 6);
 
-		if (prev_x >= 0) {
+		if (prev_x >= 0)
 			SDL_RenderDrawLine(renderer, prev_x, prev_y, x, y);
-		}
 
 		prev_x = x;
 		prev_y = y;
 	}
 }
 
-int main(void)
+static void init_move_system(void)
 {
 	move_lib_init();
 	move_lib_randomize_range(20, 30, 0.5f);
 	move_playback_set_bpm(&pb, bpm);
 	T = 1.0f / f0;
-	float beat_duration = 60.0f / bpm;  // sekunder per beat
-	float bar_duration =
-		4.0f * beat_duration;  // sekunder per takt (4 beats)
-	t_mix_start = 1.0f * bar_duration;  // start ved takt 4
-	t_mix_end = t_mix_start + bar_duration / 2.0f;	// varer én takt
+
+	float beat_duration = 60.0f / bpm;
+	float bar_duration = 4.0f * beat_duration;
+	t_mix_start = 1.0f * bar_duration;
+	t_mix_end = t_mix_start + bar_duration / 2.0f;
 
 	move_mixer.deck_a = move_no;
 	move_mixer.deck_b = move_no_b;
 	move_mixer.volume_a = 1.0f;
 	move_mixer.volume_b = 1.0f;
 
-	// Midtpose for fade_via_pose - hevet posisjon
 	fade_mid_pose.rx = 0.0f;
 	fade_mid_pose.ry = 0.0f;
 	fade_mid_pose.rz = 0.0f;
 	fade_mid_pose.tx = 0.0f;
-	fade_mid_pose.ty = 18.0f;  // Hevet 15mm
+	fade_mid_pose.ty = 18.0f;
 	fade_mid_pose.tz = 0.0f;
 	fade_mid_hold = 0.2f;
 
-	// Opprett viz socket
 	viz_sock = viz_sender_create();
-	if (viz_sock < 0) {
+	if (viz_sock < 0)
 		printf("Advarsel: Kunne ikke opprette viz socket\n");
-	}
+}
 
-	// ============ SETT OPP GRAFENE HER ============
-	struct Graph graphs[] = {
-		{ g1_rx, 244, 67, 54, "g1_rx" },  // Rød A
-		{ g1_ry, 244, 67, 54, "g1_ry" },  // Rød A
-		{ g1_rz, 244, 67, 54, "g1_rz" },  // Rød A
-		{ g1_tx, 244, 67, 54, "g1_tx" },  // Rød A
-		{ g1_ty, 244, 67, 54, "g1_ty" },  // Rød A
-		{ g1_tz, 244, 67, 54, "g1_tz" },  // Rød A
-		{ g2_rx, 33, 150, 243, "g2_rx" },  // Blå B
-		{ g2_ry, 33, 150, 243, "g2_ry" },  // Blå B
-		{ g2_rz, 33, 150, 243, "g2_rz" },  // Blå B
-		{ g2_tx, 33, 150, 243, "g2_tx" },  // Blå B
-		{ g2_ty, 33, 150, 243, "g2_ty" },  // Blå B
-		{ g2_tz, 33, 150, 243, "g2_tz" },  // Blå B
-		{ mix_rx, 200, 200, 200, "mix_rx" },  // Hvit MIX
-		{ mix_ry, 200, 200, 200, "mix_ry" },  // Hvit MIX
-		{ mix_rz, 200, 200, 200, "mix_rz" },  // Hvit MIX
-		{ mix_tx, 200, 200, 200, "mix_tx" },  // Hvit MIX
-		{ mix_ty, 200, 200, 200, "mix_ty" },  // Hvit MIX
-		{ mix_tz, 200, 200, 200, "mix_tz" }  // Hvit MIX
-	};
-
-	// Initialiser SDL
+static int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
+		    SDL_AudioDeviceID *audio_dev)
+{
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO) < 0) {
 		printf("SDL init feilet: %s\n", SDL_GetError());
-		return 1;
+		return -1;
 	}
 
-	// Sett opp audio
 	SDL_AudioSpec want, have;
-	SDL_AudioDeviceID audio_dev;
 	SDL_memset(&want, 0, sizeof(want));
 	want.freq = AUDIO_FREQ;
 	want.format = AUDIO_F32;
 	want.channels = 1;
 	want.samples = AUDIO_SAMPLES;
 	want.callback = audio_callback;
-	audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
-	if (audio_dev == 0) {
+	*audio_dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, 0);
+	if (*audio_dev == 0)
 		printf("Advarsel: Kunne ikke åpne audio: %s\n", SDL_GetError());
-	} else {
-		SDL_PauseAudioDevice(audio_dev, 0);  // Start audio
-	}
+	else
+		SDL_PauseAudioDevice(*audio_dev, 0);
 
-	SDL_Window *window = SDL_CreateWindow(
-		"wb_plotter - y(t) Graf", SDL_WINDOWPOS_CENTERED,
-		SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
-
-	if (!window) {
+	*window = SDL_CreateWindow("wb_plotter - y(t) Graf",
+				   SDL_WINDOWPOS_CENTERED,
+				   SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT,
+				   SDL_WINDOW_SHOWN);
+	if (!*window) {
 		printf("Vindu-opprettelse feilet: %s\n", SDL_GetError());
 		SDL_Quit();
-		return 1;
+		return -1;
 	}
 
-	SDL_Renderer *renderer =
-		SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-	if (!renderer) {
+	*renderer = SDL_CreateRenderer(*window, -1, SDL_RENDERER_ACCELERATED);
+	if (!*renderer) {
 		printf("Renderer-opprettelse feilet: %s\n", SDL_GetError());
-		SDL_DestroyWindow(window);
+		SDL_DestroyWindow(*window);
 		SDL_Quit();
-		return 1;
+		return -1;
 	}
 
-	// Hovedløkke
-	bool running = true;
-	SDL_Event event;
-	Uint32 last_time = SDL_GetTicks();
-	Uint32 current_time;
-	float delta_time;
+	return 0;
+}
 
-	while (running) {
-		current_time = SDL_GetTicks();
-		delta_time = (current_time - last_time) / 1000.0f;
-		last_time = current_time;
-		moving_phase = moving_phase + 0.001f;
-		// Håndter events
-		while (SDL_PollEvent(&event)) {
-			switch (event.type) {
-			case SDL_QUIT:
-				running = false;
-				break;
-			case SDL_KEYDOWN:
-				switch (event.key.keysym.sym) {
-				case SDLK_ESCAPE:
-					running = false;
-					break;
-				case SDLK_r:
-					t_is_running = 1;
-					t_current = 0.0f;
-					spline_initialized = 0;	 // Reset spline
-					break;
-				case SDLK_UP:
-					move_no_b += (move_no_b < 98);
-					move_mixer.deck_b = move_no_b;
-					snprintf(str, sizeof(str),
-						 "Move %d/%d : t=%.2f", move_no,
-						 move_no_b, t_current);
-					SDL_SetWindowTitle(window, str);
-					break;
-				case SDLK_DOWN:
-					move_no_b -= (move_no_b > 0);
-					move_mixer.deck_b = move_no_b;
-					snprintf(str, sizeof(str),
-						 "Move %d/%d : t=%.2f", move_no,
-						 move_no_b, t_current);
-					SDL_SetWindowTitle(window, str);
-					break;
-				case SDLK_LEFT:
-					t_current -= t_inc_manual;
-					if (t_current < T_START)
-						t_current = T_START;
-					send_mixed_pose_at_time(t_current);
-					snprintf(str, sizeof(str),
-						 "Move %d/%d : t=%.2f xf=%.2f",
-						 move_no, move_no_b, t_current,
-						 move_mixer.crossfader);
-					SDL_SetWindowTitle(window, str);
-					break;
-				case SDLK_RIGHT:
-					t_current += t_inc_manual;
-					if (t_current > T_END)
-						t_current = T_END;
-					send_mixed_pose_at_time(t_current);
-					snprintf(str, sizeof(str),
-						 "Move %d/%d : t=%.2f xf=%.2f",
-						 move_no, move_no_b, t_current,
-						 move_mixer.crossfader);
-					SDL_SetWindowTitle(window, str);
-					break;
-				case SDLK_f:
-					// Bytt fade-funksjon
-					if (event.key.keysym.mod & KMOD_SHIFT)
-						current_fade_index =
-							(current_fade_index -
-							 1 + NUM_FADES) %
-							NUM_FADES;
-					else
-						current_fade_index =
-							(current_fade_index +
-							 1) %
-							NUM_FADES;
-					current_fade =
-						fade_funcs[current_fade_index];
-					spline_active =
-						0;  // Bytt til fade-modus
-					snprintf(
-						str, sizeof(str), "Fade: %s",
-						fade_names[current_fade_index]);
-					SDL_SetWindowTitle(window, str);
-					break;
-				case SDLK_s:
-					// Bytt spline-type
-					spline_active = 1;
-					if (event.key.keysym.mod & KMOD_SHIFT)
-						current_spline_type =
-							(current_spline_type -
-							 1 + NUM_SPLINES) %
-							NUM_SPLINES;
-					else
-						current_spline_type =
-							(current_spline_type +
-							 1) %
-							NUM_SPLINES;
-					spline_initialized =
-						0;  // Krever ny init
-					snprintf(str, sizeof(str), "Spline: %s",
-						 spline_names
-							 [current_spline_type]);
-					SDL_SetWindowTitle(window, str);
-					break;
-				}
-				break;
-			}
-		}
-
-		// Tegn
-		SDL_SetRenderDrawColor(renderer, 0, 0, 0,
-				       255);  // Sort bakgrunn
-		SDL_RenderClear(renderer);
-
-		draw_grid(renderer);
-
-		for (int i = 0; i < NO_OF_SUBPLOTS * 3; i++) {
-			if (i > 11)
-				draw_graph(renderer, &graphs[i], i, t_mix_start,
-					   t_mix_end);
-			else
-				draw_graph(renderer, &graphs[i], i, T_START,
-					   T_END);
-		}
-
-		SDL_RenderPresent(renderer);
-		SDL_Delay(16);	// ~60 FPS
-
-		if (t_is_running) {
-			send_mixed_pose_at_time(t_current);
-			audio_playing = (t_current >= t_mix_start &&
-					 t_current <= t_mix_end);
-			snprintf(str, sizeof(str),
-				 "Move %d/%d : t=%.2f xf=%.2f", move_no,
-				 move_no_b, t_current, move_mixer.crossfader);
-			SDL_SetWindowTitle(window, str);
-			t_current += delta_time;
-		} else {
-			audio_playing = 0;
-		}
-		if (t_current > T_END)
-			t_is_running = 0;
-	}
-
-	// Rydd opp
+static void cleanup(SDL_Window *window, SDL_Renderer *renderer,
+		    SDL_AudioDeviceID audio_dev)
+{
 	if (audio_dev != 0)
 		SDL_CloseAudioDevice(audio_dev);
 	if (viz_sock >= 0)
@@ -623,7 +461,171 @@ int main(void)
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
+}
 
+static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
+{
+	switch (key.sym) {
+	case SDLK_ESCAPE:
+		*running = false;
+		break;
+	case SDLK_r:
+		t_is_running = 1;
+		t_current = 0.0f;
+		spline_initialized = 0;
+		break;
+	case SDLK_UP:
+		move_no_b += (move_no_b < 98);
+		move_mixer.deck_b = move_no_b;
+		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f",
+			 move_no, move_no_b, t_current);
+		SDL_SetWindowTitle(window, str);
+		break;
+	case SDLK_DOWN:
+		move_no_b -= (move_no_b > 0);
+		move_mixer.deck_b = move_no_b;
+		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f",
+			 move_no, move_no_b, t_current);
+		SDL_SetWindowTitle(window, str);
+		break;
+	case SDLK_LEFT:
+		t_current -= t_inc_manual;
+		if (t_current < T_START)
+			t_current = T_START;
+		send_mixed_pose_at_time(t_current);
+		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f xf=%.2f",
+			 move_no, move_no_b, t_current, move_mixer.crossfader);
+		SDL_SetWindowTitle(window, str);
+		break;
+	case SDLK_RIGHT:
+		t_current += t_inc_manual;
+		if (t_current > T_END)
+			t_current = T_END;
+		send_mixed_pose_at_time(t_current);
+		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f xf=%.2f",
+			 move_no, move_no_b, t_current, move_mixer.crossfader);
+		SDL_SetWindowTitle(window, str);
+		break;
+	case SDLK_f:
+		if (key.mod & KMOD_SHIFT)
+			current_fade_index = (current_fade_index - 1 + NUM_FADES) % NUM_FADES;
+		else
+			current_fade_index = (current_fade_index + 1) % NUM_FADES;
+		current_fade = fade_funcs[current_fade_index];
+		spline_active = 0;
+		snprintf(str, sizeof(str), "Fade: %s", fade_names[current_fade_index]);
+		SDL_SetWindowTitle(window, str);
+		break;
+	case SDLK_s:
+		spline_active = 1;
+		if (key.mod & KMOD_SHIFT)
+			current_spline_type = (current_spline_type - 1 + NUM_SPLINES) % NUM_SPLINES;
+		else
+			current_spline_type = (current_spline_type + 1) % NUM_SPLINES;
+		spline_initialized = 0;
+		snprintf(str, sizeof(str), "Spline: %s", spline_names[current_spline_type]);
+		SDL_SetWindowTitle(window, str);
+		break;
+	}
+}
+
+static void handle_events(SDL_Window *window, bool *running)
+{
+	SDL_Event event;
+	while (SDL_PollEvent(&event)) {
+		switch (event.type) {
+		case SDL_QUIT:
+			*running = false;
+			break;
+		case SDL_KEYDOWN:
+			handle_key_event(event.key.keysym, window, running);
+			break;
+		}
+	}
+}
+
+static void render_frame(SDL_Renderer *renderer, struct Graph *graphs)
+{
+	SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+	SDL_RenderClear(renderer);
+	draw_grid(renderer);
+
+	for (int i = 0; i < NO_OF_SUBPLOTS * 3; i++) {
+		if (i > 11)
+			draw_graph(renderer, &graphs[i], i, t_mix_start, t_mix_end);
+		else
+			draw_graph(renderer, &graphs[i], i, T_START, T_END);
+	}
+
+	SDL_RenderPresent(renderer);
+}
+
+static void update_playback(float delta_time, SDL_Window *window)
+{
+	if (!t_is_running) {
+		audio_playing = 0;
+		return;
+	}
+
+	send_mixed_pose_at_time(t_current);
+	audio_playing = (t_current >= t_mix_start && t_current <= t_mix_end);
+	snprintf(str, sizeof(str), "Move %d/%d : t=%.2f xf=%.2f",
+		 move_no, move_no_b, t_current, move_mixer.crossfader);
+	SDL_SetWindowTitle(window, str);
+	t_current += delta_time;
+
+	if (t_current > T_END)
+		t_is_running = 0;
+}
+
+int main(void)
+{
+	init_move_system();
+
+	struct Graph graphs[] = {
+		{ g1_rx, 244, 67, 54, "g1_rx" },
+		{ g1_ry, 244, 67, 54, "g1_ry" },
+		{ g1_rz, 244, 67, 54, "g1_rz" },
+		{ g1_tx, 244, 67, 54, "g1_tx" },
+		{ g1_ty, 244, 67, 54, "g1_ty" },
+		{ g1_tz, 244, 67, 54, "g1_tz" },
+		{ g2_rx, 33, 150, 243, "g2_rx" },
+		{ g2_ry, 33, 150, 243, "g2_ry" },
+		{ g2_rz, 33, 150, 243, "g2_rz" },
+		{ g2_tx, 33, 150, 243, "g2_tx" },
+		{ g2_ty, 33, 150, 243, "g2_ty" },
+		{ g2_tz, 33, 150, 243, "g2_tz" },
+		{ mix_rx, 200, 200, 200, "mix_rx" },
+		{ mix_ry, 200, 200, 200, "mix_ry" },
+		{ mix_rz, 200, 200, 200, "mix_rz" },
+		{ mix_tx, 200, 200, 200, "mix_tx" },
+		{ mix_ty, 200, 200, 200, "mix_ty" },
+		{ mix_tz, 200, 200, 200, "mix_tz" }
+	};
+
+	SDL_Window *window;
+	SDL_Renderer *renderer;
+	SDL_AudioDeviceID audio_dev;
+	if (init_sdl(&window, &renderer, &audio_dev) < 0)
+		return 1;
+
+	bool running = true;
+	Uint32 last_time = SDL_GetTicks();
+
+	while (running) {
+		Uint32 current_time = SDL_GetTicks();
+		float delta_time = (current_time - last_time) / 1000.0f;
+		last_time = current_time;
+		moving_phase += 0.001f;
+
+		handle_events(window, &running);
+		render_frame(renderer, graphs);
+		update_playback(delta_time, window);
+
+		SDL_Delay(16);
+	}
+
+	cleanup(window, renderer, audio_dev);
 	return 0;
 }
 

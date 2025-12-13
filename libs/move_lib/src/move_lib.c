@@ -94,11 +94,11 @@ static float eval_dof(const struct move_dof *dof, float phase1, float phase05,
  *   acc = -A*ω²*sin(ωt + φ)
  *   jerk = -A*ω³*cos(ωt + φ)
  */
-static void eval_dof_derivatives(const struct move_dof *dof,
-				 float phase1, float phase05, float phase025,
-				 float omega1, float omega05, float omega025,
-				 float max_amp, float max_bias,
-				 float *pos, float *vel, float *acc, float *jerk)
+static void eval_dof_derivatives(const struct move_dof *dof, float phase1,
+				 float phase05, float phase025, float omega1,
+				 float omega05, float omega025, float max_amp,
+				 float max_bias, float *pos, float *vel,
+				 float *acc, float *jerk)
 {
 	*pos = 0.0f;
 	*vel = 0.0f;
@@ -185,43 +185,37 @@ void move_evaluate_derivatives(const struct move *m,
 
 	/* Angular frequencies: ω = 2π * f */
 	float beats_per_sec = pb->bpm / 60.0f;
-	float omega1 = TWO_PI * beats_per_sec;        /* 1 beat */
-	float omega05 = TWO_PI * beats_per_sec * 0.5f;  /* 1/2 beat */
+	float omega1 = TWO_PI * beats_per_sec; /* 1 beat */
+	float omega05 = TWO_PI * beats_per_sec * 0.5f; /* 1/2 beat */
 	float omega025 = TWO_PI * beats_per_sec * 0.25f; /* 1/4 beat */
 
 	/* Rotations */
-	eval_dof_derivatives(&m->dof[DOF_RX], p1, p05, p025,
-			     omega1, omega05, omega025,
-			     geom->max_pose_rotation_amplitude,
-			     geom->max_pose_rotation_bias,
-			     &pos->rx, &vel->rx, &acc->rx, &jerk->rx);
-	eval_dof_derivatives(&m->dof[DOF_RY], p1, p05, p025,
-			     omega1, omega05, omega025,
-			     geom->max_pose_rotation_amplitude,
-			     geom->max_pose_rotation_bias,
-			     &pos->ry, &vel->ry, &acc->ry, &jerk->ry);
-	eval_dof_derivatives(&m->dof[DOF_RZ], p1, p05, p025,
-			     omega1, omega05, omega025,
-			     geom->max_pose_rotation_amplitude,
-			     geom->max_pose_rotation_bias,
-			     &pos->rz, &vel->rz, &acc->rz, &jerk->rz);
+	eval_dof_derivatives(&m->dof[DOF_RX], p1, p05, p025, omega1, omega05,
+			     omega025, geom->max_pose_rotation_amplitude,
+			     geom->max_pose_rotation_bias, &pos->rx, &vel->rx,
+			     &acc->rx, &jerk->rx);
+	eval_dof_derivatives(&m->dof[DOF_RY], p1, p05, p025, omega1, omega05,
+			     omega025, geom->max_pose_rotation_amplitude,
+			     geom->max_pose_rotation_bias, &pos->ry, &vel->ry,
+			     &acc->ry, &jerk->ry);
+	eval_dof_derivatives(&m->dof[DOF_RZ], p1, p05, p025, omega1, omega05,
+			     omega025, geom->max_pose_rotation_amplitude,
+			     geom->max_pose_rotation_bias, &pos->rz, &vel->rz,
+			     &acc->rz, &jerk->rz);
 
 	/* Translations */
-	eval_dof_derivatives(&m->dof[DOF_TX], p1, p05, p025,
-			     omega1, omega05, omega025,
-			     geom->max_pose_translation_amplitude,
-			     geom->max_pose_translation_bias,
-			     &pos->tx, &vel->tx, &acc->tx, &jerk->tx);
-	eval_dof_derivatives(&m->dof[DOF_TY], p1, p05, p025,
-			     omega1, omega05, omega025,
-			     geom->max_pose_translation_amplitude,
-			     geom->max_pose_translation_bias,
-			     &pos->ty, &vel->ty, &acc->ty, &jerk->ty);
-	eval_dof_derivatives(&m->dof[DOF_TZ], p1, p05, p025,
-			     omega1, omega05, omega025,
-			     geom->max_pose_translation_amplitude,
-			     geom->max_pose_translation_bias,
-			     &pos->tz, &vel->tz, &acc->tz, &jerk->tz);
+	eval_dof_derivatives(&m->dof[DOF_TX], p1, p05, p025, omega1, omega05,
+			     omega025, geom->max_pose_translation_amplitude,
+			     geom->max_pose_translation_bias, &pos->tx,
+			     &vel->tx, &acc->tx, &jerk->tx);
+	eval_dof_derivatives(&m->dof[DOF_TY], p1, p05, p025, omega1, omega05,
+			     omega025, geom->max_pose_translation_amplitude,
+			     geom->max_pose_translation_bias, &pos->ty,
+			     &vel->ty, &acc->ty, &jerk->ty);
+	eval_dof_derivatives(&m->dof[DOF_TZ], p1, p05, p025, omega1, omega05,
+			     omega025, geom->max_pose_translation_amplitude,
+			     geom->max_pose_translation_bias, &pos->tz,
+			     &vel->tz, &acc->tz, &jerk->tz);
 }
 
 void move_evaluate_mixed(const struct move_mixer *mix,
@@ -420,8 +414,7 @@ void move_swap_dofs(struct move *m, int dof_a, int dof_b)
 static void capture_target_derivatives(const struct move *m,
 				       const struct move_playback *pb,
 				       const struct stewart_geometry *geom,
-				       float t_offset,
-				       struct stewart_pose *pos,
+				       float t_offset, struct stewart_pose *pos,
 				       struct stewart_pose *vel,
 				       struct stewart_pose *acc)
 {
@@ -429,20 +422,18 @@ static void capture_target_derivatives(const struct move *m,
 	struct move_playback future_pb = *pb;
 	future_pb.t += t_offset;
 
-	struct stewart_pose jerk;  /* unused but required */
+	struct stewart_pose jerk; /* unused but required */
 	move_evaluate_derivatives(m, &future_pb, geom, pos, vel, acc, &jerk);
 }
 
-void move_spline_init_c0(struct move_spline *spline,
-			 const struct move *from,
-			 const struct move *to,
-			 const struct move_playback *pb,
-			 const struct stewart_geometry *geom,
-			 float duration)
+void move_spline_init_c0(struct move_spline *spline, const struct move *from,
+			 const struct move *to, const struct move_playback *pb,
+			 const struct stewart_geometry *geom, float duration)
 {
 	spline->t_start = pb->t;
 	spline->duration = duration;
-	spline->continuity = 0;
+	spline->type = SPLINE_C0;
+	spline->tension = 0.0f;
 
 	/* Capture current "from" position */
 	move_evaluate(from, pb, geom, &spline->p0);
@@ -459,76 +450,101 @@ void move_spline_init_c0(struct move_spline *spline,
 	memset(&spline->a1, 0, sizeof(spline->a1));
 }
 
-void move_spline_init_c1(struct move_spline *spline,
-			 const struct move *from,
-			 const struct move *to,
-			 const struct move_playback *pb,
-			 const struct stewart_geometry *geom,
-			 float duration)
+void move_spline_init_c1(struct move_spline *spline, const struct move *from,
+			 const struct move *to, const struct move_playback *pb,
+			 const struct stewart_geometry *geom, float duration)
 {
 	spline->t_start = pb->t;
 	spline->duration = duration;
-	spline->continuity = 1;
+	spline->type = SPLINE_C1;
+	spline->tension = 0.0f;
 
 	/* Capture current "from" position and velocity */
 	struct stewart_pose jerk;
-	move_evaluate_derivatives(from, pb, geom,
-				  &spline->p0, &spline->v0, &spline->a0, &jerk);
+	move_evaluate_derivatives(from, pb, geom, &spline->p0, &spline->v0,
+				  &spline->a0, &jerk);
 
 	/* Capture "to" position and velocity at end of transition */
-	capture_target_derivatives(to, pb, geom, duration,
-				   &spline->p1, &spline->v1, &spline->a1);
+	capture_target_derivatives(to, pb, geom, duration, &spline->p1,
+				   &spline->v1, &spline->a1);
 }
 
-void move_spline_init_c2(struct move_spline *spline,
-			 const struct move *from,
-			 const struct move *to,
-			 const struct move_playback *pb,
-			 const struct stewart_geometry *geom,
-			 float duration)
+void move_spline_init_c2(struct move_spline *spline, const struct move *from,
+			 const struct move *to, const struct move_playback *pb,
+			 const struct stewart_geometry *geom, float duration)
 {
 	spline->t_start = pb->t;
 	spline->duration = duration;
-	spline->continuity = 2;
+	spline->type = SPLINE_C2;
+	spline->tension = 0.0f;
 
 	/* Capture current "from" position, velocity, and acceleration */
 	struct stewart_pose jerk;
-	move_evaluate_derivatives(from, pb, geom,
-				  &spline->p0, &spline->v0, &spline->a0, &jerk);
+	move_evaluate_derivatives(from, pb, geom, &spline->p0, &spline->v0,
+				  &spline->a0, &jerk);
 
 	/* Capture "to" at end of transition */
-	capture_target_derivatives(to, pb, geom, duration,
-				   &spline->p1, &spline->v1, &spline->a1);
+	capture_target_derivatives(to, pb, geom, duration, &spline->p1,
+				   &spline->v1, &spline->a1);
 }
 
-void move_spline_init_c0_ease(struct move_spline *spline,
-			      const struct move *from,
-			      const struct move *to,
-			      const struct move_playback *pb,
-			      const struct stewart_geometry *geom,
-			      float duration,
-			      float ease_in,
-			      float ease_out)
+void move_spline_init_cardinal(struct move_spline *spline,
+			       const struct move *from, const struct move *to,
+			       const struct move_playback *pb,
+			       const struct stewart_geometry *geom,
+			       float duration, float tension)
 {
 	spline->t_start = pb->t;
 	spline->duration = duration;
-	spline->continuity = 3;  /* Special: c0 with ease */
-	spline->ease_in = (ease_in > 0.5f) ? 0.5f : ease_in;
-	spline->ease_out = (ease_out > 0.5f) ? 0.5f : ease_out;
+	spline->type = SPLINE_CARDINAL;
+	spline->tension = (tension < 0.0f) ? 0.0f :
+			  (tension > 1.0f) ? 1.0f :
+					     tension;
 
-	/* Capture current "from" position */
-	move_evaluate(from, pb, geom, &spline->p0);
+	/* Capture derivatives */
+	struct stewart_pose jerk;
+	move_evaluate_derivatives(from, pb, geom, &spline->p0, &spline->v0,
+				  &spline->a0, &jerk);
+	capture_target_derivatives(to, pb, geom, duration, &spline->p1,
+				   &spline->v1, &spline->a1);
+}
 
-	/* Capture "to" position at end of transition */
-	struct move_playback end_pb = *pb;
-	end_pb.t += duration;
-	move_evaluate(to, &end_pb, geom, &spline->p1);
+void move_spline_init_monotonic(struct move_spline *spline,
+				const struct move *from, const struct move *to,
+				const struct move_playback *pb,
+				const struct stewart_geometry *geom,
+				float duration)
+{
+	spline->t_start = pb->t;
+	spline->duration = duration;
+	spline->type = SPLINE_MONOTONIC;
+	spline->tension = 0.0f;
 
-	/* Zero velocities/accelerations (not used) */
-	memset(&spline->v0, 0, sizeof(spline->v0));
-	memset(&spline->v1, 0, sizeof(spline->v1));
-	memset(&spline->a0, 0, sizeof(spline->a0));
-	memset(&spline->a1, 0, sizeof(spline->a1));
+	/* Capture derivatives */
+	struct stewart_pose jerk;
+	move_evaluate_derivatives(from, pb, geom, &spline->p0, &spline->v0,
+				  &spline->a0, &jerk);
+	capture_target_derivatives(to, pb, geom, duration, &spline->p1,
+				   &spline->v1, &spline->a1);
+}
+
+void move_spline_init_bspline(struct move_spline *spline,
+			      const struct move *from, const struct move *to,
+			      const struct move_playback *pb,
+			      const struct stewart_geometry *geom,
+			      float duration)
+{
+	spline->t_start = pb->t;
+	spline->duration = duration;
+	spline->type = SPLINE_BSPLINE;
+	spline->tension = 0.0f;
+
+	/* Capture derivatives */
+	struct stewart_pose jerk;
+	move_evaluate_derivatives(from, pb, geom, &spline->p0, &spline->v0,
+				  &spline->a0, &jerk);
+	capture_target_derivatives(to, pb, geom, duration, &spline->p1,
+				   &spline->v1, &spline->a1);
 }
 
 /* Evaluate single DOF with C0 (linear) */
@@ -537,62 +553,9 @@ static float spline_eval_c0(float p0, float p1, float u)
 	return (1.0f - u) * p0 + u * p1;
 }
 
-/*
- * Apply ease-in/out to normalized time u
- *
- * Kubisk ease med C1 kontinuitet: starter/slutter med slope=0,
- * matcher lineær slope=1 ved grensene.
- *
- * ease_in:  andel av starten med ease (0.0-0.5)
- * ease_out: andel av slutten med ease (0.0-0.5)
- */
-static float apply_ease(float u, float ease_in, float ease_out)
-{
-	if (ease_in <= 0.0f && ease_out <= 0.0f)
-		return u;  /* Ingen ease, ren lineær */
-
-	float lin_end = 1.0f - ease_out;
-	float t;
-
-	if (u <= 0.0f) {
-		t = 0.0f;
-	} else if (u >= 1.0f) {
-		t = 1.0f;
-	} else if (u < ease_in && ease_in > 0.0f) {
-		/*
-		 * Ease-in: kubisk kurve som starter med slope=0, ender med slope=1
-		 * Betingelser: t(0)=0, t'(0)=0, t(e)=e, t'(e)=1
-		 * Løsning: t = u²(2e - u) / e²
-		 */
-		float e = ease_in;
-		t = (u * u * (2.0f * e - u)) / (e * e);
-	} else if (u > lin_end && ease_out > 0.0f) {
-		/*
-		 * Ease-out: kubisk kurve som starter med slope=1, ender med slope=0
-		 * Speilet versjon av ease-in
-		 */
-		float one_minus_u = 1.0f - u;
-		float e = ease_out;
-		t = 1.0f - (one_minus_u * one_minus_u * (2.0f * e - one_minus_u)) / (e * e);
-	} else {
-		/* Lineær sone */
-		t = u;
-	}
-
-	return t;
-}
-
-/* Evaluate single DOF with C0 + ease */
-static float spline_eval_c0_ease(float p0, float p1, float u,
-				 float ease_in, float ease_out)
-{
-	float t = apply_ease(u, ease_in, ease_out);
-	return (1.0f - t) * p0 + t * p1;
-}
-
 /* Evaluate single DOF with C1 (cubic Hermite) */
-static float spline_eval_c1(float p0, float p1, float v0, float v1,
-			    float u, float T)
+static float spline_eval_c1(float p0, float p1, float v0, float v1, float u,
+			    float T)
 {
 	float u2 = u * u;
 	float u3 = u2 * u;
@@ -607,10 +570,8 @@ static float spline_eval_c1(float p0, float p1, float v0, float v1,
 }
 
 /* Evaluate single DOF with C2 (quintic) */
-static float spline_eval_c2(float p0, float p1,
-			    float v0, float v1,
-			    float a0, float a1,
-			    float u, float T)
+static float spline_eval_c2(float p0, float p1, float v0, float v1, float a0,
+			    float a1, float u, float T)
 {
 	/*
 	 * Quintic polynomial: p(u) = sum(ai * u^i) for i=0..5
@@ -638,9 +599,11 @@ static float spline_eval_c2(float p0, float p1,
 	float c0 = p0;
 	float c1 = v0T;
 	float c2 = 0.5f * a0T2;
-	float c3 = 10.0f * dp - 6.0f * v0T - 4.0f * v1T - 1.5f * a0T2 + 0.5f * a1T2;
+	float c3 = 10.0f * dp - 6.0f * v0T - 4.0f * v1T - 1.5f * a0T2 +
+		   0.5f * a1T2;
 	float c4 = -15.0f * dp + 8.0f * v0T + 7.0f * v1T + 1.5f * a0T2 - a1T2;
-	float c5 = 6.0f * dp - 3.0f * v0T - 3.0f * v1T - 0.5f * a0T2 + 0.5f * a1T2;
+	float c5 =
+		6.0f * dp - 3.0f * v0T - 3.0f * v1T - 0.5f * a0T2 + 0.5f * a1T2;
 
 	float u2 = u * u;
 	float u3 = u2 * u;
@@ -648,6 +611,138 @@ static float spline_eval_c2(float p0, float p1,
 	float u5 = u4 * u;
 
 	return c0 + c1 * u + c2 * u2 + c3 * u3 + c4 * u4 + c5 * u5;
+}
+
+/*
+ * Cardinal spline - C1 med justerbar tension
+ * tension=0: Catmull-Rom (standard, kan overshoote)
+ * tension=1: Lineær (ingen overshoot)
+ *
+ * Tangentene skaleres med (1-tension), så høyere tension = strammere kurve
+ */
+static float spline_eval_cardinal(float p0, float p1, float v0, float v1,
+				  float u, float T, float tension)
+{
+	/* Skaler tangentene med (1 - tension) */
+	float scale = 1.0f - tension;
+	float sv0 = v0 * scale;
+	float sv1 = v1 * scale;
+
+	/* Standard cubic Hermite med skalerte tangenter */
+	float u2 = u * u;
+	float u3 = u2 * u;
+
+	float h00 = 2.0f * u3 - 3.0f * u2 + 1.0f;
+	float h10 = u3 - 2.0f * u2 + u;
+	float h01 = -2.0f * u3 + 3.0f * u2;
+	float h11 = u3 - u2;
+
+	return h00 * p0 + h10 * (sv0 * T) + h01 * p1 + h11 * (sv1 * T);
+}
+
+/*
+ * Monotonic cubic spline - garantert ingen overshoot
+ *
+ * Bruker Fritsch-Carlson metoden: clamper derivatene slik at
+ * kurven aldri går utenfor [p0, p1] intervallet.
+ */
+static float spline_eval_monotonic(float p0, float p1, float v0, float v1,
+				   float u, float T)
+{
+	float delta = p1 - p0;
+
+	/* Hvis start og slutt er like, returner konstant */
+	if (fabsf(delta) < 1e-6f) {
+		return p0;
+	}
+
+	/* Normaliser derivatene relativt til delta */
+	float d0 = v0 * T / delta;
+	float d1 = v1 * T / delta;
+
+	/*
+	 * Fritsch-Carlson monotonicity constraints:
+	 * For monoton kurve må begge derivater ha samme fortegn som delta,
+	 * og |d| <= 3 for å unngå overshoot.
+	 *
+	 * Vi clamper til [0, 3] hvis delta > 0, eller [-3, 0] hvis delta < 0
+	 */
+	if (delta > 0.0f) {
+		/* Økende: derivater må være >= 0 og <= 3 */
+		if (d0 < 0.0f)
+			d0 = 0.0f;
+		if (d0 > 3.0f)
+			d0 = 3.0f;
+		if (d1 < 0.0f)
+			d1 = 0.0f;
+		if (d1 > 3.0f)
+			d1 = 3.0f;
+	} else {
+		/* Synkende: derivater må være <= 0 og >= -3 */
+		if (d0 > 0.0f)
+			d0 = 0.0f;
+		if (d0 < -3.0f)
+			d0 = -3.0f;
+		if (d1 > 0.0f)
+			d1 = 0.0f;
+		if (d1 < -3.0f)
+			d1 = -3.0f;
+	}
+
+	/* Konverter tilbake til absolutte verdier */
+	float m0 = d0 * delta / T;
+	float m1 = d1 * delta / T;
+
+	/* Standard cubic Hermite med clampede tangenter */
+	float u2 = u * u;
+	float u3 = u2 * u;
+
+	float h00 = 2.0f * u3 - 3.0f * u2 + 1.0f;
+	float h10 = u3 - 2.0f * u2 + u;
+	float h01 = -2.0f * u3 + 3.0f * u2;
+	float h11 = u3 - u2;
+
+	return h00 * p0 + h10 * (m0 * T) + h01 * p1 + h11 * (m1 * T);
+}
+
+/*
+ * B-spline approximation
+ *
+ * Uniform cubic B-spline som approksimerer kontrollpunktene.
+ * Naturlig C2 kontinuitet og minimal overshoot fordi den
+ * "smoother" mot punktene i stedet for å gå gjennom dem.
+ *
+ * For to-punkts overgang: bruker phantom points for å få smooth kurve.
+ */
+static float spline_eval_bspline(float p0, float p1, float v0, float v1,
+				 float u, float T)
+{
+	/*
+	 * For B-spline med bare 2 punkter, lager vi phantom control points
+	 * basert på tangentene. B-spline basis gir naturlig smooth kurve.
+	 *
+	 * Control points: P-1, P0, P1, P2
+	 * P-1 = p0 - v0*T/3 (phantom før start)
+	 * P0 = p0
+	 * P1 = p1
+	 * P2 = p1 + v1*T/3 (phantom etter slutt)
+	 *
+	 * Cubic B-spline basis (for u in [0,1] over segment P0-P1):
+	 */
+	float pm1 = p0 - v0 * T / 3.0f; /* Phantom point before */
+	float p2 = p1 + v1 * T / 3.0f; /* Phantom point after */
+
+	/* Cubic uniform B-spline basis functions */
+	float u2 = u * u;
+	float u3 = u2 * u;
+
+	/* B-spline basis (Cox-de Boor for cubic) */
+	float b0 = (1.0f - u) * (1.0f - u) * (1.0f - u) / 6.0f;
+	float b1 = (3.0f * u3 - 6.0f * u2 + 4.0f) / 6.0f;
+	float b2 = (-3.0f * u3 + 3.0f * u2 + 3.0f * u + 1.0f) / 6.0f;
+	float b3 = u3 / 6.0f;
+
+	return b0 * pm1 + b1 * p0 + b2 * p1 + b3 * p2;
 }
 
 int move_spline_evaluate(const struct move_spline *spline,
@@ -665,16 +760,16 @@ int move_spline_evaluate(const struct move_spline *spline,
 	/* After end: return end pose */
 	if (elapsed >= spline->duration) {
 		*out = spline->p1;
-		return 0;  /* Transition complete */
+		return 0; /* Transition complete */
 	}
 
 	/* Normalized time u in [0, 1] */
 	float u = elapsed / spline->duration;
 	float T = spline->duration;
 
-	/* Evaluate based on continuity level */
-	switch (spline->continuity) {
-	case 0:  /* C0 - linear */
+	/* Evaluate based on spline type */
+	switch (spline->type) {
+	case SPLINE_C0: /* Linear */
 		out->rx = spline_eval_c0(spline->p0.rx, spline->p1.rx, u);
 		out->ry = spline_eval_c0(spline->p0.ry, spline->p1.ry, u);
 		out->rz = spline_eval_c0(spline->p0.rz, spline->p1.rz, u);
@@ -683,7 +778,7 @@ int move_spline_evaluate(const struct move_spline *spline,
 		out->tz = spline_eval_c0(spline->p0.tz, spline->p1.tz, u);
 		break;
 
-	case 1:  /* C1 - cubic Hermite */
+	case SPLINE_C1: /* Cubic Hermite */
 		out->rx = spline_eval_c1(spline->p0.rx, spline->p1.rx,
 					 spline->v0.rx, spline->v1.rx, u, T);
 		out->ry = spline_eval_c1(spline->p0.ry, spline->p1.ry,
@@ -698,7 +793,7 @@ int move_spline_evaluate(const struct move_spline *spline,
 					 spline->v0.tz, spline->v1.tz, u, T);
 		break;
 
-	case 2:  /* C2 - quintic */
+	case SPLINE_C2: /* Quintic Hermite */
 		out->rx = spline_eval_c2(spline->p0.rx, spline->p1.rx,
 					 spline->v0.rx, spline->v1.rx,
 					 spline->a0.rx, spline->a1.rx, u, T);
@@ -719,27 +814,75 @@ int move_spline_evaluate(const struct move_spline *spline,
 					 spline->a0.tz, spline->a1.tz, u, T);
 		break;
 
-	case 3:  /* C0 with ease-in/out */
-		out->rx = spline_eval_c0_ease(spline->p0.rx, spline->p1.rx, u,
-					      spline->ease_in, spline->ease_out);
-		out->ry = spline_eval_c0_ease(spline->p0.ry, spline->p1.ry, u,
-					      spline->ease_in, spline->ease_out);
-		out->rz = spline_eval_c0_ease(spline->p0.rz, spline->p1.rz, u,
-					      spline->ease_in, spline->ease_out);
-		out->tx = spline_eval_c0_ease(spline->p0.tx, spline->p1.tx, u,
-					      spline->ease_in, spline->ease_out);
-		out->ty = spline_eval_c0_ease(spline->p0.ty, spline->p1.ty, u,
-					      spline->ease_in, spline->ease_out);
-		out->tz = spline_eval_c0_ease(spline->p0.tz, spline->p1.tz, u,
-					      spline->ease_in, spline->ease_out);
+	case SPLINE_CARDINAL: /* Cardinal with tension */
+		out->rx = spline_eval_cardinal(spline->p0.rx, spline->p1.rx,
+					       spline->v0.rx, spline->v1.rx, u,
+					       T, spline->tension);
+		out->ry = spline_eval_cardinal(spline->p0.ry, spline->p1.ry,
+					       spline->v0.ry, spline->v1.ry, u,
+					       T, spline->tension);
+		out->rz = spline_eval_cardinal(spline->p0.rz, spline->p1.rz,
+					       spline->v0.rz, spline->v1.rz, u,
+					       T, spline->tension);
+		out->tx = spline_eval_cardinal(spline->p0.tx, spline->p1.tx,
+					       spline->v0.tx, spline->v1.tx, u,
+					       T, spline->tension);
+		out->ty = spline_eval_cardinal(spline->p0.ty, spline->p1.ty,
+					       spline->v0.ty, spline->v1.ty, u,
+					       T, spline->tension);
+		out->tz = spline_eval_cardinal(spline->p0.tz, spline->p1.tz,
+					       spline->v0.tz, spline->v1.tz, u,
+					       T, spline->tension);
+		break;
+
+	case SPLINE_MONOTONIC: /* Monotonic (no overshoot) */
+		out->rx = spline_eval_monotonic(spline->p0.rx, spline->p1.rx,
+						spline->v0.rx, spline->v1.rx, u,
+						T);
+		out->ry = spline_eval_monotonic(spline->p0.ry, spline->p1.ry,
+						spline->v0.ry, spline->v1.ry, u,
+						T);
+		out->rz = spline_eval_monotonic(spline->p0.rz, spline->p1.rz,
+						spline->v0.rz, spline->v1.rz, u,
+						T);
+		out->tx = spline_eval_monotonic(spline->p0.tx, spline->p1.tx,
+						spline->v0.tx, spline->v1.tx, u,
+						T);
+		out->ty = spline_eval_monotonic(spline->p0.ty, spline->p1.ty,
+						spline->v0.ty, spline->v1.ty, u,
+						T);
+		out->tz = spline_eval_monotonic(spline->p0.tz, spline->p1.tz,
+						spline->v0.tz, spline->v1.tz, u,
+						T);
+		break;
+
+	case SPLINE_BSPLINE: /* B-spline approximation */
+		out->rx =
+			spline_eval_bspline(spline->p0.rx, spline->p1.rx,
+					    spline->v0.rx, spline->v1.rx, u, T);
+		out->ry =
+			spline_eval_bspline(spline->p0.ry, spline->p1.ry,
+					    spline->v0.ry, spline->v1.ry, u, T);
+		out->rz =
+			spline_eval_bspline(spline->p0.rz, spline->p1.rz,
+					    spline->v0.rz, spline->v1.rz, u, T);
+		out->tx =
+			spline_eval_bspline(spline->p0.tx, spline->p1.tx,
+					    spline->v0.tx, spline->v1.tx, u, T);
+		out->ty =
+			spline_eval_bspline(spline->p0.ty, spline->p1.ty,
+					    spline->v0.ty, spline->v1.ty, u, T);
+		out->tz =
+			spline_eval_bspline(spline->p0.tz, spline->p1.tz,
+					    spline->v0.tz, spline->v1.tz, u, T);
 		break;
 
 	default:
-		*out = spline->p0;  /* Fallback */
+		*out = spline->p0; /* Fallback */
 		break;
 	}
 
-	return 1;  /* Still in transition */
+	return 1; /* Still in transition */
 }
 
 /*
@@ -880,9 +1023,8 @@ void move_lib_init(void)
 /*
  * JSON save/load
  */
-static const char *dof_names[MOVE_NUM_DOFS] = {
-	"rx", "ry", "rz", "tx", "ty", "tz"
-};
+static const char *dof_names[MOVE_NUM_DOFS] = { "rx", "ry", "rz",
+						"tx", "ty", "tz" };
 
 int move_lib_save(const char *path)
 {
@@ -916,15 +1058,18 @@ int move_lib_save(const char *path)
 
 			for (int h = 0; h < MOVE_NUM_HARMONICS; h++) {
 				cJSON *harm = cJSON_CreateObject();
-				cJSON_AddNumberToObject(harm, "amp",
+				cJSON_AddNumberToObject(
+					harm, "amp",
 					move_lib[i].dof[d].h[h].amplitude);
-				cJSON_AddNumberToObject(harm, "phase",
+				cJSON_AddNumberToObject(
+					harm, "phase",
 					move_lib[i].dof[d].h[h].phase);
 				cJSON_AddItemToArray(harmonics, harm);
 			}
 
 			cJSON_AddItemToObject(dof, "h", harmonics);
-			cJSON_AddNumberToObject(dof, "bias", move_lib[i].dof[d].bias);
+			cJSON_AddNumberToObject(dof, "bias",
+						move_lib[i].dof[d].bias);
 			cJSON_AddItemToObject(params, dof_names[d], dof);
 		}
 		cJSON_AddItemToObject(move, "params", params);
@@ -987,7 +1132,8 @@ int move_lib_load(const char *path)
 
 	int count = 0;
 	cJSON *move;
-	cJSON_ArrayForEach(move, moves) {
+	cJSON_ArrayForEach(move, moves)
+	{
 		cJSON *idx_item = cJSON_GetObjectItem(move, "index");
 		if (!cJSON_IsNumber(idx_item))
 			continue;
@@ -1017,32 +1163,48 @@ int move_lib_load(const char *path)
 		cJSON *params = cJSON_GetObjectItem(move, "params");
 		if (cJSON_IsObject(params)) {
 			for (int d = 0; d < MOVE_NUM_DOFS; d++) {
-				cJSON *dof = cJSON_GetObjectItem(params, dof_names[d]);
+				cJSON *dof = cJSON_GetObjectItem(params,
+								 dof_names[d]);
 				if (!cJSON_IsObject(dof))
 					continue;
 
-				cJSON *harmonics = cJSON_GetObjectItem(dof, "h");
+				cJSON *harmonics =
+					cJSON_GetObjectItem(dof, "h");
 				if (cJSON_IsArray(harmonics)) {
 					int h = 0;
 					cJSON *harm;
-					cJSON_ArrayForEach(harm, harmonics) {
+					cJSON_ArrayForEach(harm, harmonics)
+					{
 						if (h >= MOVE_NUM_HARMONICS)
 							break;
-						cJSON *amp = cJSON_GetObjectItem(harm, "amp");
-						cJSON *phase = cJSON_GetObjectItem(harm, "phase");
+						cJSON *amp =
+							cJSON_GetObjectItem(
+								harm, "amp");
+						cJSON *phase =
+							cJSON_GetObjectItem(
+								harm, "phase");
 						if (cJSON_IsNumber(amp))
-							move_lib[idx].dof[d].h[h].amplitude =
-								(float)amp->valuedouble;
+							move_lib[idx]
+								.dof[d]
+								.h[h]
+								.amplitude =
+								(float)amp
+									->valuedouble;
 						if (cJSON_IsNumber(phase))
-							move_lib[idx].dof[d].h[h].phase =
-								(float)phase->valuedouble;
+							move_lib[idx]
+								.dof[d]
+								.h[h]
+								.phase =
+								(float)phase
+									->valuedouble;
 						h++;
 					}
 				}
 
 				cJSON *bias = cJSON_GetObjectItem(dof, "bias");
 				if (cJSON_IsNumber(bias))
-					move_lib[idx].dof[d].bias = (float)bias->valuedouble;
+					move_lib[idx].dof[d].bias =
+						(float)bias->valuedouble;
 			}
 		}
 

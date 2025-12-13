@@ -17,7 +17,7 @@
 #ifndef MOVE_LIB_H
 #define MOVE_LIB_H
 
-#include "stewart/pose.h"  /* Required for move_spline struct */
+#include "stewart/pose.h" /* Required for move_spline struct */
 
 /*
  * Configuration
@@ -26,15 +26,15 @@
 #define MOVE_NAME_LEN 16
 #define MOVE_NUM_DOFS 6
 #define MOVE_NUM_HARMONICS 3
-#define MOVE_PARAMS_PER_DOF 7  /* 3x(amp,phase) + bias */
-#define MOVE_TOTAL_PARAMS (MOVE_NUM_DOFS * MOVE_PARAMS_PER_DOF)  /* 42 */
+#define MOVE_PARAMS_PER_DOF 7 /* 3x(amp,phase) + bias */
+#define MOVE_TOTAL_PARAMS (MOVE_NUM_DOFS * MOVE_PARAMS_PER_DOF) /* 42 */
 
 /*
  * Harmonic component - a single sine oscillator
  */
 struct move_harmonic {
-	float amplitude;  /* 0.0 - 1.0, scaled by max_amp */
-	float phase;      /* 0.0 - 1.0, scaled to 0 - 2π */
+	float amplitude; /* 0.0 - 1.0, scaled by max_amp */
+	float phase; /* 0.0 - 1.0, scaled to 0 - 2π */
 };
 
 /*
@@ -45,16 +45,16 @@ struct move_harmonic {
  */
 struct move_dof {
 	struct move_harmonic h[MOVE_NUM_HARMONICS];
-	float bias;  /* -1.0 to +1.0, scaled by max_bias */
+	float bias; /* -1.0 to +1.0, scaled by max_bias */
 };
 
 /*
  * Move flags for metadata
  */
-#define MOVE_FLAG_SYMMETRIC   (1 << 0)  /* Symmetric motion pattern */
-#define MOVE_FLAG_LOOPABLE    (1 << 1)  /* Good for looping */
-#define MOVE_FLAG_TRANSITION  (1 << 2)  /* Intended as transition move */
-#define MOVE_FLAG_PRESET      (1 << 3)  /* Factory preset, don't overwrite */
+#define MOVE_FLAG_SYMMETRIC (1 << 0) /* Symmetric motion pattern */
+#define MOVE_FLAG_LOOPABLE (1 << 1) /* Good for looping */
+#define MOVE_FLAG_TRANSITION (1 << 2) /* Intended as transition move */
+#define MOVE_FLAG_PRESET (1 << 3) /* Factory preset, don't overwrite */
 
 /*
  * DOF indices
@@ -71,7 +71,7 @@ struct move_dof {
  */
 struct move {
 	char name[MOVE_NAME_LEN];
-	struct move_dof dof[MOVE_NUM_DOFS];  /* rx, ry, rz, tx, ty, tz */
+	struct move_dof dof[MOVE_NUM_DOFS]; /* rx, ry, rz, tx, ty, tz */
 	int flags;
 	int category;
 };
@@ -80,20 +80,20 @@ struct move {
  * Mixer - DJ-deck style crossfade between two moves
  */
 struct move_mixer {
-	int deck_a;           /* Move index for deck A */
-	int deck_b;           /* Move index for deck B */
-	float crossfader;     /* 0.0 = only A, 1.0 = only B */
-	float volume_a;       /* Volume for deck A (0.0 - 1.0) */
-	float volume_b;       /* Volume for deck B (0.0 - 1.0) */
+	int deck_a; /* Move index for deck A */
+	int deck_b; /* Move index for deck B */
+	float crossfader; /* 0.0 = only A, 1.0 = only B */
+	float volume_a; /* Volume for deck A (0.0 - 1.0) */
+	float volume_b; /* Volume for deck B (0.0 - 1.0) */
 };
 
 /*
  * Playback state - runtime values separate from move definitions
  */
 struct move_playback {
-	float t;              /* Accumulated time (seconds) */
-	float bpm;            /* Beats per minute */
-	float master_phase;   /* Global phase offset (radians) */
+	float t; /* Accumulated time (seconds) */
+	float bpm; /* Beats per minute */
+	float master_phase; /* Global phase offset (radians) */
 };
 
 /*
@@ -117,8 +117,7 @@ struct stewart_geometry;
  * @geom: Pointer to robot geometry (for scaling limits)
  * @out: Output pose
  */
-void move_evaluate(const struct move *m,
-		   const struct move_playback *pb,
+void move_evaluate(const struct move *m, const struct move_playback *pb,
 		   const struct stewart_geometry *geom,
 		   struct stewart_pose *out);
 
@@ -211,10 +210,8 @@ void move_copy(struct move *dst, const struct move *src);
 void move_randomize(struct move *m, float intensity);
 
 /** Interpolate between two moves (t: 0.0 = a, 1.0 = b) */
-void move_interpolate(struct move *dst,
-		      const struct move *a,
-		      const struct move *b,
-		      float t);
+void move_interpolate(struct move *dst, const struct move *a,
+		      const struct move *b, float t);
 
 /**
  * move_mirror - Speile utvalgte DOF-er (inverterer amplitude)
@@ -252,31 +249,41 @@ void move_swap_dofs(struct move *m, int dof_a, int dof_b);
 /*
  * Spline transitions - smooth interpolation between moves
  *
- * Continuity levels:
- *   C0: Position matches at boundaries (linear blend, may have velocity jumps)
- *   C1: Position + velocity match (cubic Hermite, smooth but acceleration jumps)
- *   C2: Position + velocity + acceleration match (quintic, very smooth)
+ * Available spline types:
+ *   C0: Linear (position only, velocity jumps)
+ *   C1: Cubic Hermite (position + velocity, may overshoot)
+ *   C2: Quintic (position + velocity + acceleration, more overshoot)
+ *   Cardinal: C1 with adjustable tension (0=linear, 1=Catmull-Rom)
+ *   Monotonic: C1 guaranteed no overshoot (clamped derivatives)
+ *   B-spline: C2 approximating, naturally smooth, minimal overshoot
  */
+
+/* Spline type constants */
+#define SPLINE_C0 0 /* Linear */
+#define SPLINE_C1 1 /* Cubic Hermite */
+#define SPLINE_C2 2 /* Quintic Hermite */
+#define SPLINE_CARDINAL 4 /* Cardinal with tension */
+#define SPLINE_MONOTONIC 5 /* Monotonic cubic (no overshoot) */
+#define SPLINE_BSPLINE 6 /* B-spline approximation */
 
 /**
  * Spline transition state - holds precomputed coefficients
  */
 struct move_spline {
 	/* Start/end poses and derivatives (captured at transition start/end) */
-	struct stewart_pose p0, p1;   /* Positions */
-	struct stewart_pose v0, v1;   /* Velocities */
-	struct stewart_pose a0, a1;   /* Accelerations */
+	struct stewart_pose p0, p1; /* Positions */
+	struct stewart_pose v0, v1; /* Velocities */
+	struct stewart_pose a0, a1; /* Accelerations */
 
 	/* Transition timing */
-	float t_start;    /* When transition starts (seconds) */
-	float duration;   /* Transition duration (seconds) */
+	float t_start; /* When transition starts (seconds) */
+	float duration; /* Transition duration (seconds) */
 
-	/* Which continuity level (0, 1, 2, or 3 for c0_ease) */
-	int continuity;
+	/* Spline type (SPLINE_C0, SPLINE_C1, etc.) */
+	int type;
 
-	/* Ease parameters (for continuity=3, c0_ease) */
-	float ease_in;    /* 0.0-0.5: portion of transition with ease-in */
-	float ease_out;   /* 0.0-0.5: portion of transition with ease-out */
+	/* Parameters for specific spline types */
+	float tension; /* Cardinal: 0.0=linear, 0.5=Catmull-Rom, 1.0=tight */
 };
 
 /**
@@ -288,12 +295,9 @@ struct move_spline {
  * @geom: Robot geometry
  * @duration: Transition duration in seconds
  */
-void move_spline_init_c0(struct move_spline *spline,
-			 const struct move *from,
-			 const struct move *to,
-			 const struct move_playback *pb,
-			 const struct stewart_geometry *geom,
-			 float duration);
+void move_spline_init_c0(struct move_spline *spline, const struct move *from,
+			 const struct move *to, const struct move_playback *pb,
+			 const struct stewart_geometry *geom, float duration);
 
 /**
  * move_spline_init_c1 - Initialize C1 spline (position + velocity)
@@ -304,15 +308,13 @@ void move_spline_init_c0(struct move_spline *spline,
  * @geom: Robot geometry
  * @duration: Transition duration in seconds
  */
-void move_spline_init_c1(struct move_spline *spline,
-			 const struct move *from,
-			 const struct move *to,
-			 const struct move_playback *pb,
-			 const struct stewart_geometry *geom,
-			 float duration);
+void move_spline_init_c1(struct move_spline *spline, const struct move *from,
+			 const struct move *to, const struct move_playback *pb,
+			 const struct stewart_geometry *geom, float duration);
 
 /**
- * move_spline_init_c2 - Initialize C2 spline (position + velocity + acceleration)
+ * move_spline_init_c2 - Initialize C2 spline (position + velocity +
+ * acceleration)
  * @spline: Output spline state
  * @from: Source move
  * @to: Target move
@@ -320,35 +322,64 @@ void move_spline_init_c1(struct move_spline *spline,
  * @geom: Robot geometry
  * @duration: Transition duration in seconds
  */
-void move_spline_init_c2(struct move_spline *spline,
-			 const struct move *from,
-			 const struct move *to,
-			 const struct move_playback *pb,
-			 const struct stewart_geometry *geom,
-			 float duration);
+void move_spline_init_c2(struct move_spline *spline, const struct move *from,
+			 const struct move *to, const struct move_playback *pb,
+			 const struct stewart_geometry *geom, float duration);
 
 /**
- * move_spline_init_c0_ease - Initialize C0 spline with optional ease-in/out
+ * move_spline_init_cardinal - Initialize Cardinal spline with tension
  * @spline: Output spline state
  * @from: Source move
  * @to: Target move
  * @pb: Current playback state
  * @geom: Robot geometry
  * @duration: Transition duration in seconds
- * @ease_in: Ease-in amount (0.0-0.5, e.g. 0.2 = 20% ease-in)
- * @ease_out: Ease-out amount (0.0-0.5, e.g. 0.2 = 20% ease-out)
+ * @tension: 0.0=linear, 0.5=Catmull-Rom (standard), 1.0=tight curves
  *
- * Kombinerer lineær C0 med myk ease ved start/slutt.
- * ease_in=0.2, ease_out=0.0 gir myk start, hard slutt.
+ * Cardinal spline med justerbar stramhet. Lavere tension gir mer overshoot
+ * men glattere kurver. Høyere tension gir strammere kurver nærmere lineær.
  */
-void move_spline_init_c0_ease(struct move_spline *spline,
-			      const struct move *from,
-			      const struct move *to,
+void move_spline_init_cardinal(struct move_spline *spline,
+			       const struct move *from, const struct move *to,
+			       const struct move_playback *pb,
+			       const struct stewart_geometry *geom,
+			       float duration, float tension);
+
+/**
+ * move_spline_init_monotonic - Initialize monotonic cubic spline (no overshoot)
+ * @spline: Output spline state
+ * @from: Source move
+ * @to: Target move
+ * @pb: Current playback state
+ * @geom: Robot geometry
+ * @duration: Transition duration in seconds
+ *
+ * Garanterer at output aldri går utenfor start/slutt-verdiene.
+ * Perfekt for situasjoner der overshoot er uakseptabelt.
+ */
+void move_spline_init_monotonic(struct move_spline *spline,
+				const struct move *from, const struct move *to,
+				const struct move_playback *pb,
+				const struct stewart_geometry *geom,
+				float duration);
+
+/**
+ * move_spline_init_bspline - Initialize B-spline approximation
+ * @spline: Output spline state
+ * @from: Source move
+ * @to: Target move
+ * @pb: Current playback state
+ * @geom: Robot geometry
+ * @duration: Transition duration in seconds
+ *
+ * B-spline som approksimerer (går ikke nøyaktig gjennom punktene).
+ * Naturlig glatt med minimal overshoot. C2 kontinuitet.
+ */
+void move_spline_init_bspline(struct move_spline *spline,
+			      const struct move *from, const struct move *to,
 			      const struct move_playback *pb,
 			      const struct stewart_geometry *geom,
-			      float duration,
-			      float ease_in,
-			      float ease_out);
+			      float duration);
 
 /**
  * move_spline_evaluate - Evaluate spline at current time
