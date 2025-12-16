@@ -40,7 +40,6 @@ float f0 = 124.0f / 60.0f;
 float ph = 2.0f * M_PI * (3.0f / 4.0f);
 float T;
 float master_phase = 0.0f;
-float moving_phase = 0.0f;
 
 struct stewart_pose pose_graph_1;
 struct stewart_pose pose_graph_2;
@@ -61,6 +60,7 @@ int viz_sock = -1;
 float t_mix_start = 0.0f;
 float t_mix_end = 0.0f;
 int bpm = 150;
+int transition_beats = 4;  // Lengde på transisjon i beats
 float t_inc_manual = 0.01f;
 
 struct move_spline spline;
@@ -105,7 +105,7 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
 
 	for (int i = 0; i < samples; i++) {
 		if (audio_playing) {
-			buf[i] = 0.3f * sinf(audio_phase);
+			buf[i] = 0.1f * sinf(audio_phase);
 			audio_phase += 2.0f * M_PI * freq / AUDIO_FREQ;
 			if (audio_phase > 2.0f * M_PI)
 				audio_phase -= 2.0f * M_PI;
@@ -396,14 +396,15 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 static void init_move_system(void)
 {
 	move_lib_init();
-	move_lib_randomize_range(20, 30, 0.5f);
+	move_lib_randomize_range(20, 80, 0.5f);
 	move_playback_set_bpm(&pb, bpm);
+	pb.master_phase = master_phase;	 // Synk beat-fase
 	T = 1.0f / f0;
 
 	float beat_duration = 60.0f / bpm;
 	float bar_duration = 4.0f * beat_duration;
 	t_mix_start = 1.0f * bar_duration;
-	t_mix_end = t_mix_start + bar_duration / 2.0f;
+	t_mix_end = t_mix_start + transition_beats * beat_duration;
 
 	move_mixer.deck_a = move_no;
 	move_mixer.deck_b = move_no_b;
@@ -547,6 +548,22 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 			 spline_names[current_spline_type]);
 		SDL_SetWindowTitle(window, str);
 		break;
+	case SDLK_p:
+		/* Juster master_phase i steg på 1/8 beat (π/4) */
+		if (key.mod & KMOD_SHIFT)
+			master_phase -= 0.1f;
+		else
+			master_phase += 0.1f;
+		/* Wrap til [0, 2π) */
+		if (master_phase >= 2.0f * M_PI)
+			master_phase -= 2.0f * M_PI;
+		if (master_phase < 0.0f)
+			master_phase += 2.0f * M_PI;
+		pb.master_phase = master_phase;
+		snprintf(str, sizeof(str), "Phase: %.0f deg",
+			 master_phase * 180.0f / M_PI);
+		SDL_SetWindowTitle(window, str);
+		break;
 	}
 }
 
@@ -636,7 +653,6 @@ int main(void)
 		Uint32 current_time = SDL_GetTicks();
 		float delta_time = (current_time - last_time) / 1000.0f;
 		last_time = current_time;
-		moving_phase += 0.001f;
 
 		handle_events(window, &running);
 		render_frame(renderer, graphs);
