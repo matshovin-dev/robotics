@@ -49,14 +49,16 @@ float move_phase_1(const struct move_playback *pb)
 float move_phase_05(const struct move_playback *pb)
 {
 	float beats_per_sec = pb->bpm / 60.0f;
-	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.5f + pb->master_phase * 0.5f,
+	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.5f +
+			     pb->master_phase * 0.5f,
 		     TWO_PI);
 }
 
 float move_phase_025(const struct move_playback *pb)
 {
 	float beats_per_sec = pb->bpm / 60.0f;
-	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.25f + pb->master_phase * 0.25f,
+	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.25f +
+			     pb->master_phase * 0.25f,
 		     TWO_PI);
 }
 

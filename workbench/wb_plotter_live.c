@@ -90,23 +90,39 @@ const char *spline_names[] = {
 #define NUM_SPLINES 8
 
 /*
- * Audio for lang beep under transisjon
+ * Audio for beep ved beat-fase
  */
 #define AUDIO_FREQ 44100
 #define AUDIO_SAMPLES 512
 int audio_playing = 0;
 float audio_phase = 0.0f;
+float beep_samples_remaining = 0;  // Samples igjen av beep
+#define BEEP_DURATION_SEC 0.2f
+#define BEEP_FREQ 800.0f  // Hz
+float last_move_phase = 0.0f;  // For å detektere fase-crossing
+
+void trigger_beep(void)
+{
+	beep_samples_remaining = BEEP_DURATION_SEC * AUDIO_FREQ;
+	audio_phase = 0.0f;
+}
 
 void audio_callback(void *userdata, Uint8 *stream, int len)
 {
 	float *buf = (float *)stream;
 	int samples = len / sizeof(float);
-	float freq = 200.0f;
 
 	for (int i = 0; i < samples; i++) {
-		if (audio_playing) {
+		if (beep_samples_remaining > 0) {
+			buf[i] = 0.15f * sinf(audio_phase);
+			audio_phase += 2.0f * M_PI * BEEP_FREQ / AUDIO_FREQ;
+			if (audio_phase > 2.0f * M_PI)
+				audio_phase -= 2.0f * M_PI;
+			beep_samples_remaining--;
+		} else if (audio_playing) {
+			/* Transisjon-beep (original) */
 			buf[i] = 0.1f * sinf(audio_phase);
-			audio_phase += 2.0f * M_PI * freq / AUDIO_FREQ;
+			audio_phase += 2.0f * M_PI * 200.0f / AUDIO_FREQ;
 			if (audio_phase > 2.0f * M_PI)
 				audio_phase -= 2.0f * M_PI;
 		} else {
@@ -608,6 +624,18 @@ static void update_playback(float delta_time, SDL_Window *window)
 
 	send_mixed_pose_at_time(t_current);
 	audio_playing = (t_current >= t_mix_start && t_current <= t_mix_end);
+
+	/* Sjekk om phase_1 krysser 3π/2 (270°) - trigger beep */
+	float current_phase = move_phase_1(&pb);
+	float target_phase = 3.0f * M_PI / 2.0f;  /* 270° = 3π/2 */
+
+	/* Detekter crossing: forrige < target <= nåværende, eller wrap-around */
+	if ((last_move_phase < target_phase && current_phase >= target_phase) ||
+	    (last_move_phase > current_phase && current_phase >= target_phase)) {
+		trigger_beep();
+	}
+	last_move_phase = current_phase;
+
 	snprintf(str, sizeof(str), "Move %d/%d : t=%.2f xf=%.2f", move_no,
 		 move_no_b, t_current, move_mixer.crossfader);
 	SDL_SetWindowTitle(window, str);
