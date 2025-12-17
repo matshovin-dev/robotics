@@ -38,7 +38,7 @@ struct move_playback move_playback = {
 };
 
 /*
- * Phase functions
+ * Phase functions, ut: 0 - 2π
  */
 float move_phase_1(const struct move_playback *pb)
 {

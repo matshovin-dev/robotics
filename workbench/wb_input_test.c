@@ -52,7 +52,7 @@ static float autofade_progress; /* 0.0 to 1.0 */
 /* Click track state */
 static int click_enabled = 0;
 static float click_last_phase = 0.0f;
-static float click_cooldown = 0.0f;  /* seconds until next click allowed */
+static float click_cooldown = 0.0f; /* seconds until next click allowed */
 
 /* Print current status */
 static void print_status(void)
@@ -184,8 +184,10 @@ static int handle_event(struct input_event *ev)
 
 	/* Move presets -> load to deck B (any move 0-99) */
 	default:
-		if (ev->id >= INPUT_ID_MOVE_0 && ev->id < INPUT_ID_MOVE_0 + MOVE_LIB_SIZE)
-			move_mixer_set_deck_b(&move_mixer, ev->id - INPUT_ID_MOVE_0);
+		if (ev->id >= INPUT_ID_MOVE_0 &&
+		    ev->id < INPUT_ID_MOVE_0 + MOVE_LIB_SIZE)
+			move_mixer_set_deck_b(&move_mixer,
+					      ev->id - INPUT_ID_MOVE_0);
 		break;
 	}
 
@@ -289,13 +291,14 @@ int main(void)
 			float target = (float)AUTOFADE_TARGET_PHASE;
 
 			/* Check if we crossed target phase */
-			int crossed = (click_last_phase < target && phase >= target) ||
+			int crossed = (click_last_phase < target &&
+				       phase >= target) ||
 				      (click_last_phase > 5.0f && phase < 1.0f);
 			click_last_phase = phase;
 
 			if (crossed && click_cooldown <= 0.0f) {
 				song_player_click_trigger();
-				click_cooldown = 0.2f;  /* 200ms cooldown */
+				click_cooldown = 0.2f; /* 200ms cooldown */
 			}
 		}
 
@@ -370,7 +373,8 @@ int main(void)
 		viz_status_set(&status, "phase", move_playback.master_phase);
 		viz_status_set(&status, "crossfader", move_mixer.crossfader);
 		viz_status_set(&status, "deckB", move_mixer.deck_b);
-		viz_status_set_str(&status, "moveB", move_lib[move_mixer.deck_b].name);
+		viz_status_set_str(&status, "moveB",
+				   move_lib[move_mixer.deck_b].name);
 		viz_status_set(&status, "volumeA", move_mixer.volume_a);
 		viz_status_set(&status, "volumeB", move_mixer.volume_b);
 		viz_status_send(&status);

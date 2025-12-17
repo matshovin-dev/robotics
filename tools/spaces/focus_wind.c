@@ -6,6 +6,7 @@
 
 // Kompilér: clang -o focus focus_wind.c -framework ApplicationServices
 // -framework Carbon
+// osascript -e 'id of app "Firefox"' finner bundle ID for apper
 
 // Numpad-taster enum
 enum {
@@ -35,17 +36,17 @@ static const char *apps[NP_COUNT] = { [NP_0] = "com.microsoft.VSCode",
 				      [NP_1] = NULL,
 				      [NP_2] = NULL,
 				      [NP_3] = NULL,
-				      [NP_4] = "com.apple.finder",
+				      [NP_4] = NULL,
 				      [NP_5] = "win:Ste",
-				      [NP_6] = NULL,
+				      [NP_6] = "win:C:",
 				      [NP_7] = NULL,
 				      [NP_8] = NULL,
 				      [NP_9] = NULL,
 				      [NP_PLUS] = NULL,
-				      [NP_MINUS] = "org.mozilla.firefox",
-				      [NP_MULT] = "com.google.Chrome",
+				      [NP_MINUS] = "proc:Finder",
+				      [NP_MULT] = "org.mozilla.firefox",
 				      [NP_DIV] = NULL,
-				      [NP_EQUALS] = NULL,
+				      [NP_EQUALS] = "cmd:vscode_zen",
 				      [NP_DOT] = "com.apple.Terminal",
 				      [NP_ENTER] = NULL,
 				      [NP_CLEAR] = NULL };
@@ -83,9 +84,86 @@ static const CGKeyCode numpad_keycodes[NP_COUNT] = {
 // Prefiks for ulike typer targets
 #define PREFIX_PROC "proc:"  // Prosessnavn (f.eks. "proc:mitt_program")
 #define PREFIX_WIN "win:"  // Vindustittel (f.eks. "win:Plot Window")
+#define PREFIX_CMD "cmd:"  // Kommando (f.eks. "cmd:vscode_zen")
 
 // Global event tap referanse for re-enabling
 static CFMachPortRef g_event_tap = NULL;
+
+// Send tastetrykk
+static void send_key(CGKeyCode key, CGEventFlags flags)
+{
+	CGEventRef down = CGEventCreateKeyboardEvent(NULL, key, true);
+	CGEventRef up = CGEventCreateKeyboardEvent(NULL, key, false);
+	if (flags) {
+		CGEventSetFlags(down, flags);
+		CGEventSetFlags(up, flags);
+	}
+	CGEventPost(kCGHIDEventTap, down);
+	CGEventPost(kCGHIDEventTap, up);
+	CFRelease(down);
+	CFRelease(up);
+}
+
+// Utfør kommando
+static void run_command(const char *cmd_name)
+{
+	if (strcmp(cmd_name, "vscode_zen") == 0) {
+		// VS Code Zen Mode: Cmd+K, deretter Z
+		// Først fokuser VS Code
+		pid_t pid = 0;
+		// Finn VS Code PID
+		CFArrayRef apps = CGWindowListCopyWindowInfo(
+			kCGWindowListOptionOnScreenOnly |
+				kCGWindowListExcludeDesktopElements,
+			kCGNullWindowID);
+		if (apps) {
+			CFIndex count = CFArrayGetCount(apps);
+			for (CFIndex i = 0; i < count && pid == 0; i++) {
+				CFDictionaryRef win =
+					CFArrayGetValueAtIndex(apps, i);
+				CFStringRef name = CFDictionaryGetValue(
+					win, kCGWindowOwnerName);
+				CFNumberRef pid_ref = CFDictionaryGetValue(
+					win, kCGWindowOwnerPID);
+				if (name && pid_ref) {
+					char buf[256];
+					if (CFStringGetCString(
+						    name, buf, sizeof(buf),
+						    kCFStringEncodingUTF8)) {
+						if (strstr(buf, "Code") !=
+						    NULL) {
+							CFNumberGetValue(
+								pid_ref,
+								kCFNumberIntType,
+								&pid);
+						}
+					}
+				}
+			}
+			CFRelease(apps);
+		}
+
+		if (pid > 0) {
+			AXUIElementRef app = AXUIElementCreateApplication(pid);
+			if (app) {
+				AXUIElementSetAttributeValue(
+					app, kAXFrontmostAttribute,
+					kCFBooleanTrue);
+				CFRelease(app);
+			}
+			usleep(50000);	// Vent 50ms for fokus
+		}
+
+		// Send Cmd+K
+		send_key(kVK_ANSI_K, kCGEventFlagMaskCommand);
+		usleep(100000);	 // Vent 100ms
+		// Send Z
+		send_key(kVK_ANSI_Z, 0);
+		printf("VS Code Zen Mode toggled\n");
+	} else {
+		printf("Ukjent kommando: %s\n", cmd_name);
+	}
+}
 
 // Aktiver app via PID med Accessibility API
 static void activate_by_pid(pid_t pid)
@@ -264,7 +342,11 @@ static void activate_app(const char *target)
 {
 	pid_t pid = 0;
 
-	if (strncmp(target, PREFIX_PROC, strlen(PREFIX_PROC)) == 0) {
+	if (strncmp(target, PREFIX_CMD, strlen(PREFIX_CMD)) == 0) {
+		const char *cmd_name = target + strlen(PREFIX_CMD);
+		run_command(cmd_name);
+		return;
+	} else if (strncmp(target, PREFIX_PROC, strlen(PREFIX_PROC)) == 0) {
 		const char *proc_name = target + strlen(PREFIX_PROC);
 		pid = find_pid_by_name(proc_name);
 		printf("Aktiverer prosess: %s (PID: %d)\n", proc_name, pid);

@@ -94,16 +94,19 @@ const char *spline_names[] = {
  */
 #define AUDIO_FREQ 44100
 #define AUDIO_SAMPLES 512
-int audio_playing = 0;
-float audio_phase = 0.0f;
-float beep_samples_remaining = 0;  // Samples igjen av beep
-#define BEEP_DURATION_SEC 0.2f
-#define BEEP_FREQ 800.0f  // Hz
-float last_move_phase = 0.0f;  // For å detektere fase-crossing
+#define BEEP_DURATION_SEC 0.1f
+#define BEEP_FREQ_NORMAL 1000.0f  // Hz - normal beat
+#define BEEP_FREQ_TRANSITION 500.0f  // Hz - i transisjon
 
-void trigger_beep(void)
+float audio_phase = 0.0f;
+float beep_samples_remaining = 0;
+float beep_freq = BEEP_FREQ_NORMAL;
+float last_move_phase = 0.0f;
+
+void trigger_beep(bool in_transition)
 {
 	beep_samples_remaining = BEEP_DURATION_SEC * AUDIO_FREQ;
+	beep_freq = in_transition ? BEEP_FREQ_TRANSITION : BEEP_FREQ_NORMAL;
 	audio_phase = 0.0f;
 }
 
@@ -115,16 +118,10 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
 	for (int i = 0; i < samples; i++) {
 		if (beep_samples_remaining > 0) {
 			buf[i] = 0.15f * sinf(audio_phase);
-			audio_phase += 2.0f * M_PI * BEEP_FREQ / AUDIO_FREQ;
+			audio_phase += 2.0f * M_PI * beep_freq / AUDIO_FREQ;
 			if (audio_phase > 2.0f * M_PI)
 				audio_phase -= 2.0f * M_PI;
 			beep_samples_remaining--;
-		} else if (audio_playing) {
-			/* Transisjon-beep (original) */
-			buf[i] = 0.1f * sinf(audio_phase);
-			audio_phase += 2.0f * M_PI * 200.0f / AUDIO_FREQ;
-			if (audio_phase > 2.0f * M_PI)
-				audio_phase -= 2.0f * M_PI;
 		} else {
 			buf[i] = 0.0f;
 		}
@@ -462,7 +459,7 @@ static int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
 		SDL_PauseAudioDevice(*audio_dev, 0);
 
 	*window = SDL_CreateWindow(
-		"wb_plotter - y(t) Graf", SDL_WINDOWPOS_CENTERED,
+		"C: wb_plotter - y(t) Graf", SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED, WIDTH, HEIGHT, SDL_WINDOW_SHOWN);
 	if (!*window) {
 		printf("Vindu-opprettelse feilet: %s\n", SDL_GetError());
@@ -507,14 +504,14 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 	case SDLK_UP:
 		move_no_b += (move_no_b < 98);
 		move_mixer.deck_b = move_no_b;
-		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f", move_no,
+		snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f", move_no,
 			 move_no_b, t_current);
 		SDL_SetWindowTitle(window, str);
 		break;
 	case SDLK_DOWN:
 		move_no_b -= (move_no_b > 0);
 		move_mixer.deck_b = move_no_b;
-		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f", move_no,
+		snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f", move_no,
 			 move_no_b, t_current);
 		SDL_SetWindowTitle(window, str);
 		break;
@@ -523,7 +520,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		if (t_current < T_START)
 			t_current = T_START;
 		send_mixed_pose_at_time(t_current);
-		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f xf=%.2f",
+		snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f xf=%.2f",
 			 move_no, move_no_b, t_current, move_mixer.crossfader);
 		SDL_SetWindowTitle(window, str);
 		break;
@@ -532,7 +529,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		if (t_current > T_END)
 			t_current = T_END;
 		send_mixed_pose_at_time(t_current);
-		snprintf(str, sizeof(str), "Move %d/%d : t=%.2f xf=%.2f",
+		snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f xf=%.2f",
 			 move_no, move_no_b, t_current, move_mixer.crossfader);
 		SDL_SetWindowTitle(window, str);
 		break;
@@ -546,7 +543,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 				(current_fade_index + 1) % NUM_FADES;
 		current_fade = fade_funcs[current_fade_index];
 		spline_active = 0;
-		snprintf(str, sizeof(str), "Fade: %s",
+		snprintf(str, sizeof(str), "C: Fade: %s",
 			 fade_names[current_fade_index]);
 		SDL_SetWindowTitle(window, str);
 		break;
@@ -560,7 +557,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 			current_spline_type =
 				(current_spline_type + 1) % NUM_SPLINES;
 		spline_initialized = 0;
-		snprintf(str, sizeof(str), "Spline: %s",
+		snprintf(str, sizeof(str), "C: Spline: %s",
 			 spline_names[current_spline_type]);
 		SDL_SetWindowTitle(window, str);
 		break;
@@ -576,7 +573,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		if (master_phase < 0.0f)
 			master_phase += 2.0f * M_PI;
 		pb.master_phase = master_phase;
-		snprintf(str, sizeof(str), "Phase: %.0f deg",
+		snprintf(str, sizeof(str), "C: Phase: %.0f deg",
 			 master_phase * 180.0f / M_PI);
 		SDL_SetWindowTitle(window, str);
 		break;
@@ -617,28 +614,24 @@ static void render_frame(SDL_Renderer *renderer, struct Graph *graphs)
 
 static void update_playback(float delta_time, SDL_Window *window)
 {
-	if (!t_is_running) {
-		audio_playing = 0;
+	if (!t_is_running)
 		return;
-	}
 
 	send_mixed_pose_at_time(t_current);
-	audio_playing = (t_current >= t_mix_start && t_current <= t_mix_end);
 
 	/* Sjekk om phase_1 krysser 3π/2 (270°) - trigger beep */
 	float current_phase = move_phase_1(&pb);
 	float target_phase = 3.0f * M_PI / 2.0f; /* 270° = 3π/2 */
 
-	/* Detekter crossing: forrige < target <= nåværende, eller wrap-around
-	 */
-	if ((last_move_phase < target_phase && current_phase >= target_phase) ||
-	    (last_move_phase > current_phase &&
-	     current_phase >= target_phase)) {
-		trigger_beep();
+	/* Detekter crossing: forrige < target <= nåværende */
+	if (last_move_phase < target_phase && current_phase >= target_phase) {
+		bool in_transition =
+			(t_current >= t_mix_start && t_current <= t_mix_end);
+		trigger_beep(in_transition);
 	}
 	last_move_phase = current_phase;
 
-	snprintf(str, sizeof(str), "Move %d/%d : t=%.2f xf=%.2f", move_no,
+	snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f xf=%.2f", move_no,
 		 move_no_b, t_current, move_mixer.crossfader);
 	SDL_SetWindowTitle(window, str);
 	t_current += delta_time;
@@ -701,11 +694,13 @@ void draw_grid(SDL_Renderer *renderer)
 {
 	SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);  // Mørk grå grid
 
-	// Vertikale linjer for hver beat, justert for master_phase
+	// Vertikale linjer ved 3π/2 (270°) hvor beep trigger
 	float beat_duration = 60.0f / bpm;
-	// Konverter master_phase (radianer) til tidsforskyvning
+	// Konverter master_phase til tidsforskyvning, pluss 3/4 beat for 270°
 	float phase_offset = (master_phase / (2.0f * M_PI)) * beat_duration;
-	float t = -phase_offset;
+	float beep_offset =
+		(3.0f / 4.0f) * beat_duration;	// 3π/2 = 3/4 av beat
+	float t = -phase_offset + beep_offset;
 	// Start fra første synlige beat
 	while (t < T_START)
 		t += beat_duration;

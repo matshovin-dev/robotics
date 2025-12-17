@@ -33,7 +33,7 @@ DEPS = $(MOVE_LIB) $(STEWART_GEOM) $(MATH_UTILS) $(SONG_LIB)
 
 .PHONY: all clean deps
 
-all: deps wb_move_test wb_mixer_test wb_input_test wb_coreo_player wb_plotter
+all: deps wb_move_test wb_mixer_test wb_input_test wb_coreo_player wb_plotter wb_plotter_live
 
 deps:
 	$(MAKE) -C ../libs/math
