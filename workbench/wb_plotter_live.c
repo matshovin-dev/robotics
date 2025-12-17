@@ -627,11 +627,13 @@ static void update_playback(float delta_time, SDL_Window *window)
 
 	/* Sjekk om phase_1 krysser 3π/2 (270°) - trigger beep */
 	float current_phase = move_phase_1(&pb);
-	float target_phase = 3.0f * M_PI / 2.0f;  /* 270° = 3π/2 */
+	float target_phase = 3.0f * M_PI / 2.0f; /* 270° = 3π/2 */
 
-	/* Detekter crossing: forrige < target <= nåværende, eller wrap-around */
+	/* Detekter crossing: forrige < target <= nåværende, eller wrap-around
+	 */
 	if ((last_move_phase < target_phase && current_phase >= target_phase) ||
-	    (last_move_phase > current_phase && current_phase >= target_phase)) {
+	    (last_move_phase > current_phase &&
+	     current_phase >= target_phase)) {
 		trigger_beep();
 	}
 	last_move_phase = current_phase;
@@ -699,9 +701,16 @@ void draw_grid(SDL_Renderer *renderer)
 {
 	SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);  // Mørk grå grid
 
-	// Vertikale linjer for hver beat
+	// Vertikale linjer for hver beat, justert for master_phase
 	float beat_duration = 60.0f / bpm;
-	float t = 0.0f;
+	// Konverter master_phase (radianer) til tidsforskyvning
+	float phase_offset = (master_phase / (2.0f * M_PI)) * beat_duration;
+	float t = -phase_offset;
+	// Start fra første synlige beat
+	while (t < T_START)
+		t += beat_duration;
+	while (t > T_START + beat_duration)
+		t -= beat_duration;
 	while (t < T_END) {
 		int x = map_t_to_x(t);
 		SDL_RenderDrawLine(renderer, x, 0, x, HEIGHT);
