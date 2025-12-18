@@ -11,6 +11,7 @@ OBJS = $(BUILD_DIR)/input_keyboard.o
 UNAME := $(shell uname)
 ifeq ($(UNAME), Darwin)
     OBJS += $(BUILD_DIR)/input_midi.o
+    OBJS += $(BUILD_DIR)/input_midi_plotter.o
     MIDI_FRAMEWORKS = -framework CoreMIDI -framework CoreFoundation
 endif
 
@@ -25,6 +26,9 @@ $(BUILD_DIR)/input_keyboard.o: $(SRC_DIR)/input_keyboard.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/input_midi.o: $(SRC_DIR)/input_midi.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/input_midi_plotter.o: $(SRC_DIR)/input_midi_plotter.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:

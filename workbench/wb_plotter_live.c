@@ -2,9 +2,12 @@
  * wb_plotter_live.c - Enkel y(t) graf-plotter med live vindu
  *
  * Bygg: make wb_plotter_live
- * Kjør:  ./wb_plotter_live
+ * Kjør:  ./wb_plotter_live [start_beat] [end_beat] [music.wav] [choreo.json]
+ *
+ * Eksempel: ./wb_plotter_live 0 32 track.wav mysong.json
  *
  * Trykk ESC eller lukk vinduet for å avslutte.
+ * Trykk W eller NOTE 12 for å lagre segment til koreografi-fil.
  */
 
 #include "move_lib.h"
@@ -13,6 +16,8 @@
 #include "stewart/geometry.h"
 #include "viz_sender.h"
 #include "robotics/math/utils.h"
+#include "input_plotter.h"
+#include "cJSON.h"
 #include <SDL.h>
 #include <math.h>
 #include <stdbool.h>
@@ -20,12 +25,33 @@
 
 void draw_grid(SDL_Renderer *renderer);
 
-// ============ KONFIGURASJON ============
+/*
+ * Input
+ * master_phase +/-
+ * move_a_nr +/-
+ * move_b_nr +/-
+ * fad_start +/-
+ * fad_end +/-
+ * fad_type +/-
+ * * blend
+ * * spline 1 2 cardinal0 cardinal05 cardinal08 monotonic bspline*
+ * win_start +/-
+ * win_end +/-
+ *
+ * Titlebar
+ * C: master_phase move_a_nr move_b_nr fad_start fad_end fad_type
+ *
+ * Fil:
+ * master_phase move_a_nr move_b_nr fad_start fad_end fad_type
+ * master_phase move_a_nr move_b_nr fad_start fad_end fad_type
+ */
 
-// Tidsintervall
-#define T_START 0.0f
-#define T_END 5.0f
-#define T_STEP 1.0f / 200.0f
+// Tidsintervall (kan overstyres med kommandolinje)
+float t_start = 0.0f;
+float t_end = 5.0f;
+int start_beat = 0;
+int end_beat = 20;
+#define T_STEP (1.0f / 200.0f)
 
 // Vindu-størrelse
 #define WIDTH 1200
@@ -39,8 +65,7 @@ void draw_grid(SDL_Renderer *renderer);
 float f0 = 124.0f / 60.0f;
 float ph = 2.0f * M_PI * (3.0f / 4.0f);
 float T;
-float master_phase = 0.0f;
-
+float master_phase = 314.0f * M_PI / 180.0f;
 struct stewart_pose pose_graph_1;
 struct stewart_pose pose_graph_2;
 struct stewart_pose pose_graph_mix;
@@ -50,18 +75,27 @@ struct stewart_pose pose_mix;
 struct move_playback pb;
 const struct stewart_geometry *geom = &ROBOT_MX64;
 struct move m;
-const int move_no_a = 4;  // Hardkodet
+int move_no_a = 4;
 int move_no_b = 21;
 float t_current = 1.0f;	 // sec
 int t_is_running = 0;
-char str[32]; /* div bruk */
+char str[128]; /* tittelbar */
 int viz_sock = -1;
 
 float t_mix_start = 0.0f;
 float t_mix_end = 0.0f;
 int bpm = 150;
+int transition_start_beat = 4;	// Start-beat for transisjon
 int transition_beats = 4;  // Lengde på transisjon i beats
 float t_inc_manual = 0.01f;
+
+/* Oppdater transisjon-tider fra beat-parametre */
+static void update_transition_times(void)
+{
+	float beat_duration = 60.0f / bpm;
+	t_mix_start = transition_start_beat * beat_duration;
+	t_mix_end = t_mix_start + transition_beats * beat_duration;
+}
 
 struct move_spline spline;
 int spline_active = 0;	// 1 = bruker spline, 0 = bruker fade
@@ -89,13 +123,94 @@ const char *spline_names[] = {
 };
 #define NUM_SPLINES 8
 
+/* Koreografi-fil */
+const char *choreo_filename = "choreo.json";
+int segment_count = 0;
+
+/* Lagre segment til koreografi-fil */
+static void save_segment(void)
+{
+	cJSON *root = NULL;
+	cJSON *segments = NULL;
+
+	/* Les eksisterende fil eller opprett ny */
+	FILE *f = fopen(choreo_filename, "r");
+	if (f) {
+		fseek(f, 0, SEEK_END);
+		long len = ftell(f);
+		fseek(f, 0, SEEK_SET);
+		char *data = malloc(len + 1);
+		fread(data, 1, len, f);
+		data[len] = '\0';
+		fclose(f);
+		root = cJSON_Parse(data);
+		free(data);
+	}
+
+	if (!root) {
+		/* Opprett ny struktur */
+		root = cJSON_CreateObject();
+		cJSON_AddNumberToObject(root, "bpm", bpm);
+		cJSON_AddNumberToObject(root, "master_phase", master_phase * 180.0f / M_PI);
+		segments = cJSON_CreateArray();
+		cJSON_AddItemToObject(root, "segments", segments);
+	} else {
+		/* Oppdater bpm og phase */
+		cJSON *bpm_item = cJSON_GetObjectItem(root, "bpm");
+		if (bpm_item) bpm_item->valuedouble = bpm;
+		cJSON *phase_item = cJSON_GetObjectItem(root, "master_phase");
+		if (phase_item) phase_item->valuedouble = master_phase * 180.0f / M_PI;
+		segments = cJSON_GetObjectItem(root, "segments");
+	}
+
+	/* Opprett nytt segment */
+	cJSON *seg = cJSON_CreateObject();
+	cJSON_AddNumberToObject(seg, "move_a", move_no_a);
+	cJSON_AddNumberToObject(seg, "move_b", move_no_b);
+	cJSON_AddStringToObject(seg, "trans_type", spline_active ? "S" : "F");
+	cJSON_AddNumberToObject(seg, "trans_nr",
+		spline_active ? current_spline_type : current_fade_index);
+	cJSON_AddNumberToObject(seg, "trans_start", transition_start_beat);
+	cJSON_AddNumberToObject(seg, "trans_len", transition_beats);
+
+	cJSON_AddItemToArray(segments, seg);
+	segment_count = cJSON_GetArraySize(segments);
+
+	/* Skriv til fil */
+	char *json_str = cJSON_Print(root);
+	f = fopen(choreo_filename, "w");
+	if (f) {
+		fprintf(f, "%s\n", json_str);
+		fclose(f);
+		printf("Lagret segment %d til %s\n", segment_count, choreo_filename);
+	}
+	free(json_str);
+	cJSON_Delete(root);
+}
+
+/* Oppdater tittelbar med alle parametre */
+static void update_title(SDL_Window *window)
+{
+	snprintf(str, sizeof(str),
+		 "C: %d %.0f %d %d %s %d %d %d",
+		 bpm,
+		 master_phase * 180.0f / M_PI,
+		 move_no_a,
+		 move_no_b,
+		 spline_active ? "S" : "F",
+		 spline_active ? current_spline_type : current_fade_index,
+		 transition_start_beat,
+		 transition_beats);
+	SDL_SetWindowTitle(window, str);
+}
+
 /*
  * Audio for beep ved beat-fase
  */
 #define AUDIO_FREQ 44100
 #define AUDIO_SAMPLES 128 /* Lavere = mindre latency, men mer CPU */
 #define BEEP_DURATION_SEC 0.02f
-#define AUDIO_BEEP_VOLUME 0.4f
+#define AUDIO_BEEP_VOLUME 0.12f
 #define BEEP_FREQ_NORMAL 1000.0f  // Hz - normal beat
 #define BEEP_FREQ_TRANSITION 500.0f  // Hz - i transisjon
 
@@ -103,6 +218,74 @@ float audio_phase = 0.0f;
 float beep_samples_remaining = 0;
 float beep_freq = BEEP_FREQ_NORMAL;
 float last_move_phase = 0.0f;
+
+/* Musikk fra WAV-fil */
+Uint8 *music_wav_buffer = NULL; /* Rå WAV-data */
+float *music_samples = NULL; /* Konvertert til float */
+Uint32 music_wav_length = 0;
+int music_sample_count = 0;
+int music_channels = 1;
+int music_sample_rate = AUDIO_FREQ;
+float music_volume = 0.3f;
+int music_offset_samples = 0; /* Offset i WAV for start_beat */
+
+/* Last WAV-fil og konverter til float samples */
+int load_music(const char *filename)
+{
+	SDL_AudioSpec wav_spec;
+	if (SDL_LoadWAV(filename, &wav_spec, &music_wav_buffer,
+			&music_wav_length) == NULL) {
+		printf("Kunne ikke laste %s: %s\n", filename, SDL_GetError());
+		return -1;
+	}
+
+	music_sample_rate = wav_spec.freq;
+	music_channels = wav_spec.channels;
+
+	/* Beregn antall samples (avhenger av format) */
+	int bytes_per_sample = 2; /* Anta 16-bit */
+	if (wav_spec.format == AUDIO_S16LSB || wav_spec.format == AUDIO_S16MSB)
+		bytes_per_sample = 2;
+	else if (wav_spec.format == AUDIO_F32LSB ||
+		 wav_spec.format == AUDIO_F32MSB)
+		bytes_per_sample = 4;
+
+	music_sample_count =
+		music_wav_length / bytes_per_sample / music_channels;
+
+	/* Konverter til mono float */
+	music_samples = malloc(music_sample_count * sizeof(float));
+	if (!music_samples) {
+		SDL_FreeWAV(music_wav_buffer);
+		return -1;
+	}
+
+	for (int i = 0; i < music_sample_count; i++) {
+		float sample = 0.0f;
+		if (wav_spec.format == AUDIO_S16LSB ||
+		    wav_spec.format == AUDIO_S16MSB) {
+			Sint16 *data = (Sint16 *)music_wav_buffer;
+			/* Mix alle kanaler til mono */
+			for (int ch = 0; ch < music_channels; ch++) {
+				sample += data[i * music_channels + ch] /
+					  32768.0f;
+			}
+			sample /= music_channels;
+		} else if (wav_spec.format == AUDIO_F32LSB ||
+			   wav_spec.format == AUDIO_F32MSB) {
+			float *data = (float *)music_wav_buffer;
+			for (int ch = 0; ch < music_channels; ch++) {
+				sample += data[i * music_channels + ch];
+			}
+			sample /= music_channels;
+		}
+		music_samples[i] = sample;
+	}
+
+	printf("Lastet musikk: %s (%d samples, %d Hz, %d kanaler)\n", filename,
+	       music_sample_count, music_sample_rate, music_channels);
+	return 0;
+}
 
 void trigger_beep(bool in_transition)
 {
@@ -125,21 +308,47 @@ void check_beep_at_time(float t)
 	last_move_phase = current_phase;
 }
 
+/* Global for synkronisering av musikk med visning */
+volatile int music_playback_pos = 0; /* Samples spilt, styres av callback */
+volatile int music_sync_request = 0; /* Sett til 1 for å synke til audio_time */
+volatile int music_playing = 0; /* 1 = musikk spiller, 0 = pauset */
+volatile float audio_time = 0.0f; /* Mål-tid ved sync */
+
 void audio_callback(void *userdata, Uint8 *stream, int len)
 {
 	float *buf = (float *)stream;
 	int samples = len / sizeof(float);
 
+	/* Synkroniser musikk-posisjon hvis forespurt (seek/reset) */
+	if (music_sync_request) {
+		music_playback_pos =
+			(int)((audio_time - t_start) * music_sample_rate) +
+			music_offset_samples;
+		music_sync_request = 0;
+	}
+
 	for (int i = 0; i < samples; i++) {
+		float beep_out = 0.0f;
+		float music_out = 0.0f;
+
+		/* Beep */
 		if (beep_samples_remaining > 0) {
-			buf[i] = AUDIO_BEEP_VOLUME * sinf(audio_phase);
+			beep_out = AUDIO_BEEP_VOLUME * sinf(audio_phase);
 			audio_phase += 2.0f * M_PI * beep_freq / AUDIO_FREQ;
 			if (audio_phase > 2.0f * M_PI)
 				audio_phase -= 2.0f * M_PI;
 			beep_samples_remaining--;
-		} else {
-			buf[i] = 0.0f;
 		}
+
+		/* Musikk - kun når playing */
+		if (music_playing && music_samples && music_playback_pos >= 0 &&
+		    music_playback_pos < music_sample_count) {
+			music_out = music_samples[music_playback_pos] *
+				    music_volume;
+			music_playback_pos++;
+		}
+
+		buf[i] = beep_out + music_out;
 	}
 }
 
@@ -342,7 +551,7 @@ send:
 
 int map_t_to_x(float t)
 {
-	return (int)((t - T_START) / (T_END - T_START) * WIDTH);
+	return (int)((t - t_start) / (t_end - t_start) * WIDTH);
 }
 
 int map_y_to_screen(float y, int subplot_no)
@@ -429,10 +638,7 @@ static void init_move_system(void)
 	pb.master_phase = master_phase;	 // Synk beat-fase
 	T = 1.0f / f0;
 
-	float beat_duration = 60.0f / bpm;
-	float bar_duration = 4.0f * beat_duration;
-	t_mix_start = 1.0f * bar_duration;
-	t_mix_end = t_mix_start + transition_beats * beat_duration;
+	update_transition_times();
 
 	move_mixer.deck_a = move_no_a;
 	move_mixer.deck_b = move_no_b;
@@ -450,6 +656,9 @@ static void init_move_system(void)
 	viz_sock = viz_sender_create();
 	if (viz_sock < 0)
 		printf("Advarsel: Kunne ikke opprette viz socket\n");
+
+	if (input_plotter_init() < 0)
+		printf("Advarsel: MIDI ikke tilgjengelig\n");
 }
 
 static int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
@@ -496,10 +705,15 @@ static int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
 static void cleanup(SDL_Window *window, SDL_Renderer *renderer,
 		    SDL_AudioDeviceID audio_dev)
 {
+	input_plotter_cleanup();
 	if (audio_dev != 0)
 		SDL_CloseAudioDevice(audio_dev);
 	if (viz_sock >= 0)
 		close(viz_sock);
+	if (music_samples)
+		free(music_samples);
+	if (music_wav_buffer)
+		SDL_FreeWAV(music_wav_buffer);
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
@@ -513,7 +727,10 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		break;
 	case SDLK_r:
 		t_is_running = 1;
-		t_current = 0.0f;
+		t_current = t_start;
+		audio_time = t_start;
+		music_sync_request = 1;
+		music_playing = 1;
 		spline_initialized = 0;
 		move_playback_reset(&pb);
 		pb.master_phase = master_phase;
@@ -523,38 +740,30 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 	case SDLK_UP:
 		move_no_b += (move_no_b < 98);
 		move_mixer.deck_b = move_no_b;
-		snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f", move_no_a,
-			 move_no_b, t_current);
-		SDL_SetWindowTitle(window, str);
+		update_title(window);
 		break;
 	case SDLK_DOWN:
 		move_no_b -= (move_no_b > 0);
 		move_mixer.deck_b = move_no_b;
-		snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f", move_no_a,
-			 move_no_b, t_current);
-		SDL_SetWindowTitle(window, str);
+		update_title(window);
 		break;
 	case SDLK_LEFT:
 		t_current -= t_inc_manual;
-		if (t_current < T_START)
-			t_current = T_START;
+		if (t_current < t_start)
+			t_current = t_start;
+		audio_time = t_current;
 		send_mixed_pose_at_time(t_current);
 		check_beep_at_time(t_current);
-		snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f xf=%.2f",
-			 move_no_a, move_no_b, t_current,
-			 move_mixer.crossfader);
-		SDL_SetWindowTitle(window, str);
+		update_title(window);
 		break;
 	case SDLK_RIGHT:
 		t_current += t_inc_manual;
-		if (t_current > T_END)
-			t_current = T_END;
+		if (t_current > t_end)
+			t_current = t_end;
+		audio_time = t_current;
 		send_mixed_pose_at_time(t_current);
 		check_beep_at_time(t_current);
-		snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f xf=%.2f",
-			 move_no_a, move_no_b, t_current,
-			 move_mixer.crossfader);
-		SDL_SetWindowTitle(window, str);
+		update_title(window);
 		break;
 	case SDLK_f:
 		if (key.mod & KMOD_SHIFT)
@@ -566,9 +775,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 				(current_fade_index + 1) % NUM_FADES;
 		current_fade = fade_funcs[current_fade_index];
 		spline_active = 0;
-		snprintf(str, sizeof(str), "C: Fade: %s",
-			 fade_names[current_fade_index]);
-		SDL_SetWindowTitle(window, str);
+		update_title(window);
 		break;
 	case SDLK_s:
 		spline_active = 1;
@@ -580,9 +787,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 			current_spline_type =
 				(current_spline_type + 1) % NUM_SPLINES;
 		spline_initialized = 0;
-		snprintf(str, sizeof(str), "C: Spline: %s",
-			 spline_names[current_spline_type]);
-		SDL_SetWindowTitle(window, str);
+		update_title(window);
 		break;
 	case SDLK_p:
 		/* Juster master_phase i steg på 1/8 beat (π/4) */
@@ -596,10 +801,159 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		if (master_phase < 0.0f)
 			master_phase += 2.0f * M_PI;
 		pb.master_phase = master_phase;
-		snprintf(str, sizeof(str), "C: Phase: %.0f deg",
-			 master_phase * 180.0f / M_PI);
-		SDL_SetWindowTitle(window, str);
+		update_title(window);
 		break;
+	case SDLK_o:
+		/* O/o = Juster transisjon-lengde i beats */
+		if (key.mod & KMOD_SHIFT)
+			transition_beats += 1;
+		else
+			transition_beats -= (transition_beats > 1) ? 1 : 0;
+		update_transition_times();
+		spline_initialized = 0;
+		update_title(window);
+		break;
+	case SDLK_i:
+		/* I/i = Juster transisjon start-beat */
+		if (key.mod & KMOD_SHIFT)
+			transition_start_beat += 1;
+		else
+			transition_start_beat -=
+				(transition_start_beat > 0) ? 1 : 0;
+		update_transition_times();
+		spline_initialized = 0;
+		update_title(window);
+		break;
+	case SDLK_w:
+		save_segment();
+		break;
+	}
+}
+
+static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
+{
+	if (ev->type == PLOTTER_ENCODER) {
+		switch (ev->id) {
+		case PLOTTER_ID_PHASE_COARSE:
+			master_phase += ev->value * 0.2f;
+			if (master_phase >= 2.0f * M_PI)
+				master_phase -= 2.0f * M_PI;
+			if (master_phase < 0.0f)
+				master_phase += 2.0f * M_PI;
+			pb.master_phase = master_phase;
+			update_title(window);
+			break;
+		case PLOTTER_ID_PHASE_FINE:
+			master_phase += ev->value * 0.05f;
+			if (master_phase >= 2.0f * M_PI)
+				master_phase -= 2.0f * M_PI;
+			if (master_phase < 0.0f)
+				master_phase += 2.0f * M_PI;
+			pb.master_phase = master_phase;
+			update_title(window);
+			break;
+		case PLOTTER_ID_BPM:
+			bpm += (int)ev->value;
+			if (bpm < 30) bpm = 30;
+			if (bpm > 300) bpm = 300;
+			move_playback_set_bpm(&pb, bpm);
+			update_transition_times();
+			update_title(window);
+			break;
+		case PLOTTER_ID_MOVE_A:
+			move_no_a += (int)ev->value;
+			if (move_no_a < 0) move_no_a = 0;
+			if (move_no_a > 98) move_no_a = 98;
+			move_mixer.deck_a = move_no_a;
+			update_title(window);
+			break;
+		case PLOTTER_ID_MOVE_B:
+			move_no_b += (int)ev->value;
+			if (move_no_b < 0) move_no_b = 0;
+			if (move_no_b > 98) move_no_b = 98;
+			move_mixer.deck_b = move_no_b;
+			update_title(window);
+			break;
+		case PLOTTER_ID_TRANS_START:
+			transition_start_beat += (int)ev->value;
+			if (transition_start_beat < 0)
+				transition_start_beat = 0;
+			update_transition_times();
+			spline_initialized = 0;
+			update_title(window);
+			break;
+		case PLOTTER_ID_TRANS_LEN:
+			transition_beats += (int)ev->value;
+			if (transition_beats < 1) transition_beats = 1;
+			update_transition_times();
+			spline_initialized = 0;
+			update_title(window);
+			break;
+		case PLOTTER_ID_TRANS_TYPE:
+			if (ev->value > 0) {
+				if (spline_active) {
+					current_spline_type =
+						(current_spline_type + 1) % NUM_SPLINES;
+					spline_initialized = 0;
+				} else {
+					current_fade_index =
+						(current_fade_index + 1) % NUM_FADES;
+					current_fade = fade_funcs[current_fade_index];
+				}
+			} else {
+				if (spline_active) {
+					current_spline_type =
+						(current_spline_type - 1 + NUM_SPLINES) % NUM_SPLINES;
+					spline_initialized = 0;
+				} else {
+					current_fade_index =
+						(current_fade_index - 1 + NUM_FADES) % NUM_FADES;
+					current_fade = fade_funcs[current_fade_index];
+				}
+			}
+			update_title(window);
+			break;
+		}
+	} else if (ev->type == PLOTTER_BUTTON && ev->value > 0) {
+		switch (ev->id) {
+		case PLOTTER_ID_RUN:
+			t_is_running = 1;
+			t_current = t_start;
+			audio_time = t_start;
+			music_sync_request = 1;
+			music_playing = 1;
+			spline_initialized = 0;
+			move_playback_reset(&pb);
+			pb.master_phase = master_phase;
+			last_move_phase = move_phase_1(&pb);
+			break;
+		case PLOTTER_ID_SPLINE_MODE:
+			spline_active = !spline_active;
+			spline_initialized = 0;
+			update_title(window);
+			break;
+		case PLOTTER_ID_TIME_LEFT:
+			t_current -= t_inc_manual;
+			if (t_current < t_start)
+				t_current = t_start;
+			audio_time = t_current;
+			send_mixed_pose_at_time(t_current);
+			check_beep_at_time(t_current);
+			update_title(window);
+			break;
+		case PLOTTER_ID_TIME_RIGHT:
+			t_current += t_inc_manual;
+			if (t_current > t_end)
+				t_current = t_end;
+			audio_time = t_current;
+			send_mixed_pose_at_time(t_current);
+			check_beep_at_time(t_current);
+			update_title(window);
+			break;
+		case PLOTTER_ID_SAVE:
+			save_segment();
+			break;
+		}
 	}
 }
 
@@ -616,6 +970,12 @@ static void handle_events(SDL_Window *window, bool *running)
 			break;
 		}
 	}
+
+	/* Poll MIDI */
+	struct plotter_event midi_ev;
+	while (input_plotter_poll(&midi_ev)) {
+		handle_midi_event(&midi_ev, window);
+	}
 }
 
 static void render_frame(SDL_Renderer *renderer, struct Graph *graphs)
@@ -629,7 +989,7 @@ static void render_frame(SDL_Renderer *renderer, struct Graph *graphs)
 			draw_graph(renderer, &graphs[i], i, t_mix_start,
 				   t_mix_end);
 		else
-			draw_graph(renderer, &graphs[i], i, T_START, T_END);
+			draw_graph(renderer, &graphs[i], i, t_start, t_end);
 	}
 
 	SDL_RenderPresent(renderer);
@@ -642,19 +1002,49 @@ static void update_playback(float delta_time, SDL_Window *window)
 
 	send_mixed_pose_at_time(t_current);
 	check_beep_at_time(t_current);
+	audio_time = t_current; /* Synkroniser musikk med visning */
 
-	snprintf(str, sizeof(str), "C: Move %d/%d : t=%.2f xf=%.2f", move_no_a,
-		 move_no_b, t_current, move_mixer.crossfader);
-	SDL_SetWindowTitle(window, str);
+	update_title(window);
 	t_current += delta_time;
 
-	if (t_current > T_END)
+	if (t_current > t_end) {
 		t_is_running = 0;
+		music_playing = 0;
+	}
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
+	/* Kommandolinje-argumenter: start_beat end_beat [music.wav] [choreo.json] */
+	if (argc >= 3) {
+		start_beat = atoi(argv[1]);
+		end_beat = atoi(argv[2]);
+	}
+	if (argc >= 5) {
+		choreo_filename = argv[4];
+	}
+
 	init_move_system();
+
+	/* Beregn tidsintervall fra beats */
+	float beat_duration = 60.0f / bpm;
+	t_start = start_beat * beat_duration;
+	t_end = end_beat * beat_duration;
+	t_current = t_start;
+
+	/* Last musikk hvis spesifisert */
+	if (argc >= 4) {
+		if (load_music(argv[3]) == 0) {
+			/* Beregn offset i WAV-filen for start_beat */
+			music_offset_samples =
+				(int)(t_start * music_sample_rate);
+			printf("Musikk starter ved sample %d (beat %d)\n",
+			       music_offset_samples, start_beat);
+		}
+	}
+
+	printf("Kjører fra beat %d til %d (%.2f - %.2f sek)\n", start_beat,
+	       end_beat, t_start, t_end);
 
 	struct Graph graphs[] = { { g1_rx, 244, 67, 54, "g1_rx" },
 				  { g1_ry, 244, 67, 54, "g1_ry" },
@@ -714,11 +1104,11 @@ void draw_grid(SDL_Renderer *renderer)
 		(3.0f / 4.0f) * beat_duration;	// 3π/2 = 3/4 av beat
 	float t = -phase_offset + beep_offset;
 	// Start fra første synlige beat
-	while (t < T_START)
+	while (t < t_start)
 		t += beat_duration;
-	while (t > T_START + beat_duration)
+	while (t > t_start + beat_duration)
 		t -= beat_duration;
-	while (t < T_END) {
+	while (t < t_end) {
 		int x = map_t_to_x(t);
 		SDL_RenderDrawLine(renderer, x, 0, x, HEIGHT);
 		t = t + beat_duration;

@@ -60,9 +60,10 @@ wb_plotter: wb_plotter.c
 CJSON = ../libs/song_lib/build/cJSON.o
 
 FADE_LIB = ../libs/fade_lib/src/fade_lib.c
+INPUT_PLOTTER = ../libs/input/build/input_midi_plotter.o
 
-wb_plotter_live: wb_plotter_live.c $(FADE_LIB) $(MOVE_LIB) $(CJSON) $(STEWART_GEOM) $(MATH_UTILS)
-	$(CC) -Wall -std=c11 -O2 -I ../libs/move_lib/include -I ../libs/fade_lib/include -I ../platforms/stewart/include -I ../libs/math/include -I ../viz-modules/common/include $< $(FADE_LIB) $(MOVE_LIB) $(CJSON) $(STEWART_GEOM) $(MATH_UTILS) $(VIZ_COMMON) -o $@ -lm $(shell sdl2-config --cflags --libs)
+wb_plotter_live: wb_plotter_live.c $(FADE_LIB) $(MOVE_LIB) $(CJSON) $(STEWART_GEOM) $(MATH_UTILS) $(INPUT_PLOTTER)
+	$(CC) -Wall -std=c11 -O2 -I ../libs/move_lib/include -I ../libs/fade_lib/include -I ../libs/input/include -I ../libs/song_lib/vendor -I ../platforms/stewart/include -I ../libs/math/include -I ../viz-modules/common/include $< $(FADE_LIB) $(MOVE_LIB) $(CJSON) $(STEWART_GEOM) $(MATH_UTILS) $(INPUT_PLOTTER) $(VIZ_COMMON) -o $@ -lm $(shell sdl2-config --cflags --libs) -framework CoreMIDI -framework CoreFoundation
 
 clean:
 	rm -f wb_move_test wb_mixer_test wb_input_test wb_coreo_player wb_plotter wb_plotter_live
