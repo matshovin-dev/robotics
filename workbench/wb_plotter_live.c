@@ -151,15 +151,18 @@ static void save_segment(void)
 		/* Opprett ny struktur */
 		root = cJSON_CreateObject();
 		cJSON_AddNumberToObject(root, "bpm", bpm);
-		cJSON_AddNumberToObject(root, "master_phase", master_phase * 180.0f / M_PI);
+		cJSON_AddNumberToObject(root, "master_phase",
+					master_phase * 180.0f / M_PI);
 		segments = cJSON_CreateArray();
 		cJSON_AddItemToObject(root, "segments", segments);
 	} else {
 		/* Oppdater bpm og phase */
 		cJSON *bpm_item = cJSON_GetObjectItem(root, "bpm");
-		if (bpm_item) bpm_item->valuedouble = bpm;
+		if (bpm_item)
+			bpm_item->valuedouble = bpm;
 		cJSON *phase_item = cJSON_GetObjectItem(root, "master_phase");
-		if (phase_item) phase_item->valuedouble = master_phase * 180.0f / M_PI;
+		if (phase_item)
+			phase_item->valuedouble = master_phase * 180.0f / M_PI;
 		segments = cJSON_GetObjectItem(root, "segments");
 	}
 
@@ -169,7 +172,8 @@ static void save_segment(void)
 	cJSON_AddNumberToObject(seg, "move_b", move_no_b);
 	cJSON_AddStringToObject(seg, "trans_type", spline_active ? "S" : "F");
 	cJSON_AddNumberToObject(seg, "trans_nr",
-		spline_active ? current_spline_type : current_fade_index);
+				spline_active ? current_spline_type :
+						current_fade_index);
 	cJSON_AddNumberToObject(seg, "trans_start", transition_start_beat);
 	cJSON_AddNumberToObject(seg, "trans_len", transition_beats);
 
@@ -182,26 +186,66 @@ static void save_segment(void)
 	if (f) {
 		fprintf(f, "%s\n", json_str);
 		fclose(f);
-		printf("Lagret segment %d til %s\n", segment_count, choreo_filename);
+		printf("Lagret segment %d til %s\n", segment_count,
+		       choreo_filename);
 	}
 	free(json_str);
 	cJSON_Delete(root);
 }
 
+/* Oppdater LCD med verdier */
+static void update_lcd_values(void)
+{
+	char buf[8];
+
+	/* Display 0: PHASE grov */
+	snprintf(buf, sizeof(buf), "%5.0f", master_phase * 180.0f / M_PI);
+	input_plotter_set_lcd(0, LCD_COLOR_GREEN, " GROV", buf);
+
+	/* Display 1: PHASE fin */
+	snprintf(buf, sizeof(buf), "%5.0f", master_phase * 180.0f / M_PI);
+	input_plotter_set_lcd(1, LCD_COLOR_GREEN, "  FIN", buf);
+
+	/* Display 2: BPM */
+	snprintf(buf, sizeof(buf), "  %3d", bpm);
+	input_plotter_set_lcd(2, LCD_COLOR_GREEN, "  BPM", buf);
+
+	/* Display 3: MOVE A */
+	snprintf(buf, sizeof(buf), "  %3d", move_no_a);
+	input_plotter_set_lcd(3, LCD_COLOR_BLUE, "MOVE A", buf);
+
+	/* Display 4: MOVE B */
+	snprintf(buf, sizeof(buf), "  %3d", move_no_b);
+	input_plotter_set_lcd(4, LCD_COLOR_BLUE, "MOVE B", buf);
+
+	/* Display 5: START beat */
+	snprintf(buf, sizeof(buf), "  %3d", transition_start_beat);
+	input_plotter_set_lcd(5, LCD_COLOR_YELLOW, " START", buf);
+
+	/* Display 6: LEN beats */
+	snprintf(buf, sizeof(buf), "  %3d", transition_beats);
+	input_plotter_set_lcd(6, LCD_COLOR_YELLOW, "  LEN", buf);
+
+	/* Display 7: TYPE (Spline or Fade) */
+	if (spline_active) {
+		snprintf(buf, sizeof(buf), " S%d", current_spline_type);
+		input_plotter_set_lcd(7, LCD_COLOR_MAGENTA, "SPLINE", buf);
+	} else {
+		snprintf(buf, sizeof(buf), " F%d", current_fade_index);
+		input_plotter_set_lcd(7, LCD_COLOR_CYAN, " FADE", buf);
+	}
+}
+
 /* Oppdater tittelbar med alle parametre */
 static void update_title(SDL_Window *window)
 {
-	snprintf(str, sizeof(str),
-		 "C: %d %.0f %d %d %s %d %d %d",
-		 bpm,
-		 master_phase * 180.0f / M_PI,
-		 move_no_a,
-		 move_no_b,
+	snprintf(str, sizeof(str), "C: %d %.0f %d %d %s %d %d %d", bpm,
+		 master_phase * 180.0f / M_PI, move_no_a, move_no_b,
 		 spline_active ? "S" : "F",
 		 spline_active ? current_spline_type : current_fade_index,
-		 transition_start_beat,
-		 transition_beats);
+		 transition_start_beat, transition_beats);
 	SDL_SetWindowTitle(window, str);
+	update_lcd_values();
 }
 
 /*
@@ -657,8 +701,12 @@ static void init_move_system(void)
 	if (viz_sock < 0)
 		printf("Advarsel: Kunne ikke opprette viz socket\n");
 
-	if (input_plotter_init() < 0)
+	if (input_plotter_init() < 0) {
 		printf("Advarsel: MIDI ikke tilgjengelig\n");
+	} else {
+		/* Initialize LCD displays with current values */
+		update_lcd_values();
+	}
 }
 
 static int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
@@ -854,23 +902,29 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			break;
 		case PLOTTER_ID_BPM:
 			bpm += (int)ev->value;
-			if (bpm < 30) bpm = 30;
-			if (bpm > 300) bpm = 300;
+			if (bpm < 30)
+				bpm = 30;
+			if (bpm > 300)
+				bpm = 300;
 			move_playback_set_bpm(&pb, bpm);
 			update_transition_times();
 			update_title(window);
 			break;
 		case PLOTTER_ID_MOVE_A:
 			move_no_a += (int)ev->value;
-			if (move_no_a < 0) move_no_a = 0;
-			if (move_no_a > 98) move_no_a = 98;
+			if (move_no_a < 0)
+				move_no_a = 0;
+			if (move_no_a > 98)
+				move_no_a = 98;
 			move_mixer.deck_a = move_no_a;
 			update_title(window);
 			break;
 		case PLOTTER_ID_MOVE_B:
 			move_no_b += (int)ev->value;
-			if (move_no_b < 0) move_no_b = 0;
-			if (move_no_b > 98) move_no_b = 98;
+			if (move_no_b < 0)
+				move_no_b = 0;
+			if (move_no_b > 98)
+				move_no_b = 98;
 			move_mixer.deck_b = move_no_b;
 			update_title(window);
 			break;
@@ -884,7 +938,8 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			break;
 		case PLOTTER_ID_TRANS_LEN:
 			transition_beats += (int)ev->value;
-			if (transition_beats < 1) transition_beats = 1;
+			if (transition_beats < 1)
+				transition_beats = 1;
 			update_transition_times();
 			spline_initialized = 0;
 			update_title(window);
@@ -893,22 +948,30 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			if (ev->value > 0) {
 				if (spline_active) {
 					current_spline_type =
-						(current_spline_type + 1) % NUM_SPLINES;
+						(current_spline_type + 1) %
+						NUM_SPLINES;
 					spline_initialized = 0;
 				} else {
 					current_fade_index =
-						(current_fade_index + 1) % NUM_FADES;
-					current_fade = fade_funcs[current_fade_index];
+						(current_fade_index + 1) %
+						NUM_FADES;
+					current_fade =
+						fade_funcs[current_fade_index];
 				}
 			} else {
 				if (spline_active) {
 					current_spline_type =
-						(current_spline_type - 1 + NUM_SPLINES) % NUM_SPLINES;
+						(current_spline_type - 1 +
+						 NUM_SPLINES) %
+						NUM_SPLINES;
 					spline_initialized = 0;
 				} else {
 					current_fade_index =
-						(current_fade_index - 1 + NUM_FADES) % NUM_FADES;
-					current_fade = fade_funcs[current_fade_index];
+						(current_fade_index - 1 +
+						 NUM_FADES) %
+						NUM_FADES;
+					current_fade =
+						fade_funcs[current_fade_index];
 				}
 			}
 			update_title(window);
@@ -1015,7 +1078,8 @@ static void update_playback(float delta_time, SDL_Window *window)
 
 int main(int argc, char *argv[])
 {
-	/* Kommandolinje-argumenter: start_beat end_beat [music.wav] [choreo.json] */
+	/* Kommandolinje-argumenter: start_beat end_beat [music.wav]
+	 * [choreo.json] */
 	if (argc >= 3) {
 		start_beat = atoi(argv[1]);
 		end_beat = atoi(argv[2]);

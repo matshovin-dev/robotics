@@ -53,9 +53,21 @@ static int queue_tail = 0;
 
 /* CoreMIDI handles */
 static MIDIClientRef midi_client = 0;
-static MIDIPortRef midi_port = 0;
+static MIDIPortRef midi_input_port = 0;
+static MIDIPortRef midi_output_port = 0;
 static MIDIEndpointRef midi_source = 0;
+static MIDIEndpointRef midi_dest = 0;
 static int initialized = 0;
+
+/* SysEx header for Behringer X-Touch Extender LCD */
+static const Byte SYSEX_LCD_HEADER[] = {
+	0xF0,  /* SysEx start */
+	0x00,  /* Manufacturer ID byte 1 */
+	0x20,  /* Manufacturer ID byte 2 */
+	0x32,  /* Manufacturer ID byte 3 (Behringer) */
+	0x15,  /* Device ID */
+	0x4C   /* LCD command */
+};
 
 /* Queue helpers */
 static int queue_empty(void)
@@ -90,9 +102,9 @@ static int queue_pop(struct plotter_event *ev)
 static float encoder_delta(int value)
 {
 	if (value == 1)
-		return 1.0f;   /* clockwise */
+		return -1.0f;  /* clockwise */
 	if (value == 65)
-		return -1.0f;  /* counter-clockwise */
+		return 1.0f;   /* counter-clockwise */
 	return 0.0f;
 }
 
@@ -226,7 +238,7 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 	}
 }
 
-/* Find Behringer source */
+/* Find Behringer MIDI source (input) */
 static MIDIEndpointRef find_behringer_source(void)
 {
 	ItemCount num_sources = MIDIGetNumberOfSources();
@@ -255,6 +267,35 @@ static MIDIEndpointRef find_behringer_source(void)
 	return 0;
 }
 
+/* Find Behringer MIDI destination (output) */
+static MIDIEndpointRef find_behringer_dest(void)
+{
+	ItemCount num_dests = MIDIGetNumberOfDestinations();
+
+	for (ItemCount i = 0; i < num_dests; i++) {
+		MIDIEndpointRef dest = MIDIGetDestination(i);
+		CFStringRef name = NULL;
+
+		MIDIObjectGetStringProperty(dest, kMIDIPropertyName, &name);
+		if (name) {
+			char buf[256];
+			CFStringGetCString(name, buf, sizeof(buf),
+					   kCFStringEncodingUTF8);
+			CFRelease(name);
+
+			/* Match X-Touch or Behringer */
+			if (strstr(buf, "X-Touch") ||
+			    strstr(buf, "X-TOUCH") ||
+			    strstr(buf, "Behringer") ||
+			    strstr(buf, "BEHRINGER")) {
+				printf("Found MIDI destination: %s\n", buf);
+				return dest;
+			}
+		}
+	}
+	return 0;
+}
+
 int input_plotter_init(void)
 {
 	OSStatus status;
@@ -272,19 +313,30 @@ int input_plotter_init(void)
 	}
 
 	/* Create input port */
-	status = MIDIInputPortCreate(midi_client, CFSTR("PlotterPort"),
-				     midi_read_callback, NULL, &midi_port);
+	status = MIDIInputPortCreate(midi_client, CFSTR("PlotterInputPort"),
+				     midi_read_callback, NULL, &midi_input_port);
 	if (status != noErr) {
-		fprintf(stderr, "Failed to create MIDI port: %d\n",
+		fprintf(stderr, "Failed to create MIDI input port: %d\n",
 			(int)status);
 		MIDIClientDispose(midi_client);
 		return -1;
 	}
 
-	/* Find Behringer */
+	/* Create output port */
+	status = MIDIOutputPortCreate(midi_client, CFSTR("PlotterOutputPort"),
+				      &midi_output_port);
+	if (status != noErr) {
+		fprintf(stderr, "Failed to create MIDI output port: %d\n",
+			(int)status);
+		MIDIPortDispose(midi_input_port);
+		MIDIClientDispose(midi_client);
+		return -1;
+	}
+
+	/* Find Behringer source (input) */
 	midi_source = find_behringer_source();
 	if (!midi_source) {
-		fprintf(stderr, "Behringer not found. Available sources:\n");
+		fprintf(stderr, "Behringer source not found. Available:\n");
 		ItemCount n = MIDIGetNumberOfSources();
 		for (ItemCount i = 0; i < n; i++) {
 			MIDIEndpointRef src = MIDIGetSource(i);
@@ -299,23 +351,33 @@ int input_plotter_init(void)
 					(unsigned long)i, buf);
 			}
 		}
-		MIDIPortDispose(midi_port);
+		MIDIPortDispose(midi_output_port);
+		MIDIPortDispose(midi_input_port);
 		MIDIClientDispose(midi_client);
 		return -1;
 	}
 
-	/* Connect source to port */
-	status = MIDIPortConnectSource(midi_port, midi_source, NULL);
+	/* Find Behringer destination (output) */
+	midi_dest = find_behringer_dest();
+	if (!midi_dest) {
+		fprintf(stderr, "Warning: Behringer output not found, "
+			"LCD functions disabled\n");
+		/* Continue anyway - input still works */
+	}
+
+	/* Connect source to input port */
+	status = MIDIPortConnectSource(midi_input_port, midi_source, NULL);
 	if (status != noErr) {
 		fprintf(stderr, "Failed to connect MIDI source: %d\n",
 			(int)status);
-		MIDIPortDispose(midi_port);
+		MIDIPortDispose(midi_output_port);
+		MIDIPortDispose(midi_input_port);
 		MIDIClientDispose(midi_client);
 		return -1;
 	}
 
 	initialized = 1;
-	printf("Plotter MIDI input initialized (Behringer)\n");
+	printf("Plotter MIDI initialized (Behringer)\n");
 	return 0;
 }
 
@@ -330,12 +392,89 @@ void input_plotter_cleanup(void)
 {
 	if (initialized) {
 		if (midi_source)
-			MIDIPortDisconnectSource(midi_port, midi_source);
-		if (midi_port)
-			MIDIPortDispose(midi_port);
+			MIDIPortDisconnectSource(midi_input_port, midi_source);
+		if (midi_output_port)
+			MIDIPortDispose(midi_output_port);
+		if (midi_input_port)
+			MIDIPortDispose(midi_input_port);
 		if (midi_client)
 			MIDIClientDispose(midi_client);
 		initialized = 0;
-		printf("Plotter MIDI input closed\n");
+		printf("Plotter MIDI closed\n");
+	}
+}
+
+int input_plotter_set_lcd(int display, int color,
+			  const char *top, const char *bottom)
+{
+	if (!initialized || !midi_dest)
+		return -1;
+
+	if (display < 0 || display > 7)
+		return -1;
+
+	/*
+	 * SysEx format for X-Touch Extender LCD:
+	 * F0 00 20 32 15 4C [nr] [color] [7 chars top] [7 chars bottom] F7
+	 * Total: 23 bytes
+	 */
+	Byte sysex[23];
+	int idx = 0;
+
+	/* Header */
+	for (int i = 0; i < 6; i++)
+		sysex[idx++] = SYSEX_LCD_HEADER[i];
+
+	/* Display number and color */
+	sysex[idx++] = (Byte)display;
+	sysex[idx++] = (Byte)color;
+
+	/* Top line - 7 characters, pad with spaces */
+	for (int i = 0; i < 7; i++) {
+		if (top && top[i] != '\0')
+			sysex[idx++] = (Byte)top[i];
+		else
+			sysex[idx++] = ' ';
+		if (top && top[i] == '\0')
+			top = NULL;  /* Stop reading after null */
+	}
+
+	/* Bottom line - 7 characters, pad with spaces */
+	for (int i = 0; i < 7; i++) {
+		if (bottom && bottom[i] != '\0')
+			sysex[idx++] = (Byte)bottom[i];
+		else
+			sysex[idx++] = ' ';
+		if (bottom && bottom[i] == '\0')
+			bottom = NULL;
+	}
+
+	/* SysEx end */
+	sysex[idx++] = 0xF7;
+
+	/* Send via CoreMIDI */
+	Byte buffer[256];
+	MIDIPacketList *pktlist = (MIDIPacketList *)buffer;
+	MIDIPacket *pkt = MIDIPacketListInit(pktlist);
+	pkt = MIDIPacketListAdd(pktlist, sizeof(buffer), pkt, 0, 23, sysex);
+
+	if (!pkt) {
+		fprintf(stderr, "Failed to create MIDI packet\n");
+		return -1;
+	}
+
+	OSStatus status = MIDISend(midi_output_port, midi_dest, pktlist);
+	if (status != noErr) {
+		fprintf(stderr, "Failed to send MIDI: %d\n", (int)status);
+		return -1;
+	}
+
+	return 0;
+}
+
+void input_plotter_clear_all_lcd(void)
+{
+	for (int i = 0; i < 8; i++) {
+		input_plotter_set_lcd(i, LCD_COLOR_OFF, "", "");
 	}
 }

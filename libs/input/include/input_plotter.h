@@ -63,4 +63,32 @@ int input_plotter_poll(struct plotter_event *ev);
  */
 void input_plotter_cleanup(void);
 
+/**
+ * LCD colors for X-Touch Extender
+ */
+#define LCD_COLOR_OFF      0
+#define LCD_COLOR_RED      1
+#define LCD_COLOR_GREEN    2
+#define LCD_COLOR_YELLOW   3
+#define LCD_COLOR_BLUE     4
+#define LCD_COLOR_MAGENTA  5
+#define LCD_COLOR_CYAN     6
+#define LCD_COLOR_WHITE    7
+
+/**
+ * input_plotter_set_lcd - Set LCD display text and color
+ * @display: Display number 0-7
+ * @color: LCD_COLOR_* constant
+ * @top: Top line text (max 7 chars, will be padded/truncated)
+ * @bottom: Bottom line text (max 7 chars, will be padded/truncated)
+ * Returns 0 on success, -1 on error.
+ */
+int input_plotter_set_lcd(int display, int color,
+			  const char *top, const char *bottom);
+
+/**
+ * input_plotter_clear_all_lcd - Clear all 8 LCD displays
+ */
+void input_plotter_clear_all_lcd(void);
+
 #endif /* INPUT_PLOTTER_H */
