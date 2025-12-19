@@ -50,4 +50,23 @@ struct viz_pose_packet {
 	float tx, ty, tz;
 } __attribute__((packed));
 
+/**
+ * struct viz_move_bars_packet - Move parameter bar plot packet
+ * @magic: magic number (VIZ_MAGIC) for validation
+ * @type: packet type (VIZ_PACKET_MOVE_BARS)
+ * @move_no: move number for display
+ * @values: 42 float values (0.0-1.0) for bar heights
+ *
+ * Used by plot_move_bars to visualize all 42 move parameters.
+ */
+#define VIZ_MOVE_BARS_COUNT 42
+#define VIZ_PACKET_MOVE_BARS 3
+
+struct viz_move_bars_packet {
+	uint32_t magic;
+	uint32_t type;
+	uint32_t move_no;
+	float values[VIZ_MOVE_BARS_COUNT];
+} __attribute__((packed));
+
 #endif /* VIZ_PROTOCOL_H */

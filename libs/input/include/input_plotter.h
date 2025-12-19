@@ -31,6 +31,8 @@
 #define PLOTTER_ID_TIME_LEFT       12  /* Step time left (button) */
 #define PLOTTER_ID_TIME_RIGHT      13  /* Step time right (button) */
 #define PLOTTER_ID_SAVE            14  /* Save current segment (button) */
+#define PLOTTER_ID_TIME_LEFT_FAST  15  /* Step time left 4x (button) */
+#define PLOTTER_ID_TIME_RIGHT_FAST 16  /* Step time right 4x (button) */
 
 /**
  * struct plotter_event - Input event for plotter

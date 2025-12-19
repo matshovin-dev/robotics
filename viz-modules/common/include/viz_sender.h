@@ -45,4 +45,16 @@ int viz_sender_send_pose(int sock, const struct stewart_pose *pose,
 int viz_send_pose(const struct stewart_pose *pose,
 		  enum stewart_robot_type robot_type, int port);
 
+/**
+ * viz_sender_send_move_bars - Send 42 move parameters as bar values
+ * @sock: UDP socket (fra viz_sender_create)
+ * @move_no: move number for display
+ * @values: array of 42 floats (0.0-1.0) for bar heights
+ * @port: destinasjons port (default VIZ_PORT_MOVE_BARS = 9010)
+ *
+ * Retur: 0 ved suksess, -1 ved feil
+ */
+int viz_sender_send_move_bars(int sock, int move_no, const float *values,
+			      int port);
+
 #endif /* VIZ_SENDER_H */

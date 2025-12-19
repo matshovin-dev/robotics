@@ -70,3 +70,31 @@ int viz_send_pose(const struct stewart_pose *pose,
 
 	return result;
 }
+
+int viz_sender_send_move_bars(int sock, int move_no, const float *values,
+			      int port)
+{
+	struct sockaddr_in addr;
+	struct viz_move_bars_packet packet;
+	ssize_t sent;
+
+	packet.magic = VIZ_MAGIC;
+	packet.type = VIZ_PACKET_MOVE_BARS;
+	packet.move_no = move_no;
+	memcpy(packet.values, values, sizeof(packet.values));
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+	sent = sendto(sock, &packet, sizeof(packet), 0,
+		      (struct sockaddr *)&addr, sizeof(addr));
+
+	if (sent < 0) {
+		perror("sendto");
+		return -1;
+	}
+
+	return 0;
+}

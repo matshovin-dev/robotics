@@ -45,6 +45,10 @@
 #define MIDI_NOTE_TIME_RIGHT  11
 #define MIDI_NOTE_SAVE        12
 
+/* MIDI NOTE mappings - button row 2 (fast time step) */
+#define MIDI_NOTE_TIME_LEFT_FAST  18
+#define MIDI_NOTE_TIME_RIGHT_FAST 19
+
 /* Event queue */
 #define EVENT_QUEUE_SIZE 32
 static struct plotter_event event_queue[EVENT_QUEUE_SIZE];
@@ -197,6 +201,12 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					case MIDI_NOTE_SAVE:
 						ev.id = PLOTTER_ID_SAVE;
 						break;
+					case MIDI_NOTE_TIME_LEFT_FAST:
+						ev.id = PLOTTER_ID_TIME_LEFT_FAST;
+						break;
+					case MIDI_NOTE_TIME_RIGHT_FAST:
+						ev.id = PLOTTER_ID_TIME_RIGHT_FAST;
+						break;
 					default:
 						ev.type = -1;  /* Unknown button */
 						break;
@@ -224,6 +234,12 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					break;
 				case MIDI_NOTE_SAVE:
 					ev.id = PLOTTER_ID_SAVE;
+					break;
+				case MIDI_NOTE_TIME_LEFT_FAST:
+					ev.id = PLOTTER_ID_TIME_LEFT_FAST;
+					break;
+				case MIDI_NOTE_TIME_RIGHT_FAST:
+					ev.id = PLOTTER_ID_TIME_RIGHT_FAST;
 					break;
 				default:
 					ev.type = -1;

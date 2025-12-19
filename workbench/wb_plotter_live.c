@@ -15,6 +15,7 @@
 #include "stewart/pose.h"
 #include "stewart/geometry.h"
 #include "viz_sender.h"
+#include "viz_ports.h"
 #include "robotics/math/utils.h"
 #include "input_plotter.h"
 #include "cJSON.h"
@@ -236,11 +237,35 @@ static void update_lcd_values(void)
 	}
 }
 
+/* Send move parameters til bar visualizer */
+static void send_move_bars(int move_no)
+{
+	if (viz_sock < 0)
+		return;
+
+	float values[42];
+	const struct move *m = &move_lib[move_no];
+	int idx = 0;
+
+	/* Pack move into 42 floats: 6 DOFs x 7 params */
+	for (int dof = 0; dof < 6; dof++) {
+		/* 3 harmonics: amp, phase for each */
+		for (int h = 0; h < 3; h++) {
+			values[idx++] = m->dof[dof].h[h].amplitude;
+			values[idx++] = m->dof[dof].h[h].phase;
+		}
+		/* Bias: convert from -1..+1 to 0..1 */
+		values[idx++] = (m->dof[dof].bias + 1.0f) * 0.5f;
+	}
+
+	viz_sender_send_move_bars(viz_sock, move_no, values, VIZ_PORT_MOVE_BARS);
+}
+
 /* Oppdater tittelbar med alle parametre */
 static void update_title(SDL_Window *window)
 {
-	snprintf(str, sizeof(str), "C: %d %.0f %d %d %s %d %d %d", bpm,
-		 master_phase * 180.0f / M_PI, move_no_a, move_no_b,
+	snprintf(str, sizeof(str), "Phase:%.0f BPM:%d A:%d B:%d %s%d @%d+%d",
+		 master_phase * 180.0f / M_PI, bpm, move_no_a, move_no_b,
 		 spline_active ? "S" : "F",
 		 spline_active ? current_spline_type : current_fade_index,
 		 transition_start_beat, transition_beats);
@@ -700,6 +725,8 @@ static void init_move_system(void)
 	viz_sock = viz_sender_create();
 	if (viz_sock < 0)
 		printf("Advarsel: Kunne ikke opprette viz socket\n");
+	else
+		send_move_bars(move_no_a);  /* Send initial move */
 
 	if (input_plotter_init() < 0) {
 		printf("Advarsel: MIDI ikke tilgjengelig\n");
@@ -789,11 +816,13 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		move_no_b += (move_no_b < 98);
 		move_mixer.deck_b = move_no_b;
 		update_title(window);
+		send_move_bars(move_no_b);
 		break;
 	case SDLK_DOWN:
 		move_no_b -= (move_no_b > 0);
 		move_mixer.deck_b = move_no_b;
 		update_title(window);
+		send_move_bars(move_no_b);
 		break;
 	case SDLK_LEFT:
 		t_current -= t_inc_manual;
@@ -918,6 +947,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 				move_no_a = 98;
 			move_mixer.deck_a = move_no_a;
 			update_title(window);
+			send_move_bars(move_no_a);
 			break;
 		case PLOTTER_ID_MOVE_B:
 			move_no_b += (int)ev->value;
@@ -927,6 +957,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 				move_no_b = 98;
 			move_mixer.deck_b = move_no_b;
 			update_title(window);
+			send_move_bars(move_no_b);
 			break;
 		case PLOTTER_ID_TRANS_START:
 			transition_start_beat += (int)ev->value;
@@ -1015,6 +1046,24 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			break;
 		case PLOTTER_ID_SAVE:
 			save_segment();
+			break;
+		case PLOTTER_ID_TIME_LEFT_FAST:
+			t_current -= t_inc_manual * 4.0f;
+			if (t_current < t_start)
+				t_current = t_start;
+			audio_time = t_current;
+			send_mixed_pose_at_time(t_current);
+			check_beep_at_time(t_current);
+			update_title(window);
+			break;
+		case PLOTTER_ID_TIME_RIGHT_FAST:
+			t_current += t_inc_manual * 4.0f;
+			if (t_current > t_end)
+				t_current = t_end;
+			audio_time = t_current;
+			send_mixed_pose_at_time(t_current);
+			check_beep_at_time(t_current);
+			update_title(window);
 			break;
 		}
 	}
