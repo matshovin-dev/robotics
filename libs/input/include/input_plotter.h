@@ -38,6 +38,7 @@
 #define PLOTTER_ID_SAVE_MOVE_LIB   19  /* Save move_lib to file (button) */
 #define PLOTTER_ID_CLEAR_DECK_B    20  /* Clear deck B move (button) */
 #define PLOTTER_ID_RANDOM_DECK_B   21  /* Randomize deck B move (button) */
+#define PLOTTER_ID_RUN_4_BEATS     22  /* Run 4 beats from next beat (button) */
 
 /**
  * struct plotter_event - Input event for plotter

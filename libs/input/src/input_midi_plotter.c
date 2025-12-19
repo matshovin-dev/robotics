@@ -56,6 +56,7 @@
 #define MIDI_NOTE_CLEAR_DECK_B    28
 
 /* MIDI NOTE mappings - button row 4 */
+#define MIDI_NOTE_RUN_4_BEATS     32
 #define MIDI_NOTE_RANDOM_DECK_B   36
 
 /* Event queue */
@@ -228,6 +229,9 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					case MIDI_NOTE_CLEAR_DECK_B:
 						ev.id = PLOTTER_ID_CLEAR_DECK_B;
 						break;
+					case MIDI_NOTE_RUN_4_BEATS:
+						ev.id = PLOTTER_ID_RUN_4_BEATS;
+						break;
 					case MIDI_NOTE_RANDOM_DECK_B:
 						ev.id = PLOTTER_ID_RANDOM_DECK_B;
 						break;
@@ -276,6 +280,9 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					break;
 				case MIDI_NOTE_CLEAR_DECK_B:
 					ev.id = PLOTTER_ID_CLEAR_DECK_B;
+					break;
+				case MIDI_NOTE_RUN_4_BEATS:
+					ev.id = PLOTTER_ID_RUN_4_BEATS;
 					break;
 				case MIDI_NOTE_RANDOM_DECK_B:
 					ev.id = PLOTTER_ID_RANDOM_DECK_B;

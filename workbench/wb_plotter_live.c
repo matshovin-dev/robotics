@@ -81,6 +81,8 @@ int move_no_b = 21;
 float t_current = 1.0f;	 // sec
 int t_is_running = 0;
 int run_repeat = 0;  // Loop playback when reaching end
+float run_loop_start = 0.0f;  // Start of current run loop
+float run_loop_end = 0.0f;    // End of current run loop
 char str[128]; /* tittelbar */
 int viz_sock = -1;
 
@@ -810,6 +812,8 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		*running = false;
 		break;
 	case SDLK_r:
+		run_loop_start = t_start;
+		run_loop_end = t_end;
 		t_is_running = 1;
 		t_current = t_start;
 		audio_time = t_start;
@@ -1019,6 +1023,8 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 	} else if (ev->type == PLOTTER_BUTTON && ev->value > 0) {
 		switch (ev->id) {
 		case PLOTTER_ID_RUN:
+			run_loop_start = t_start;
+			run_loop_end = t_end;
 			t_is_running = 1;
 			t_current = t_start;
 			audio_time = t_start;
@@ -1096,6 +1102,29 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			printf("Randomized move %d (deck B)\n", move_no_b);
 			send_move_bars(move_no_b);
 			break;
+		case PLOTTER_ID_RUN_4_BEATS: {
+			/* Finn nærmeste beat opp i tid */
+			float beat_dur = 60.0f / bpm;
+			float beats_elapsed = t_current / beat_dur;
+			int next_beat = (int)ceilf(beats_elapsed);
+			float next_beat_time = next_beat * beat_dur;
+
+			/* Sett loop til 4 beats fra neste beat */
+			run_loop_start = next_beat_time;
+			run_loop_end = next_beat_time + 4.0f * beat_dur;
+
+			/* Start run */
+			t_is_running = 1;
+			t_current = run_loop_start;
+			audio_time = run_loop_start;
+			music_sync_request = 1;
+			spline_initialized = 0;
+			move_playback_reset(&pb);
+			pb.master_phase = master_phase;
+			last_move_phase = move_phase_1(&pb);
+			printf("Run 4 beats: %.2f - %.2f\n", run_loop_start, run_loop_end);
+			break;
+		}
 		}
 	}
 }
@@ -1150,10 +1179,10 @@ static void update_playback(float delta_time, SDL_Window *window)
 	update_title(window);
 	t_current += delta_time;
 
-	if (t_current > t_end) {
+	if (t_current > run_loop_end) {
 		if (run_repeat) {
-			t_current = t_start;
-			audio_time = t_start;
+			t_current = run_loop_start;
+			audio_time = run_loop_start;
 			music_sync_request = 1;
 			spline_initialized = 0;
 			move_playback_reset(&pb);
