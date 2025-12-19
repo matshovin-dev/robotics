@@ -49,9 +49,14 @@
 #define MIDI_NOTE_REPEAT          16
 #define MIDI_NOTE_TIME_LEFT_FAST  18
 #define MIDI_NOTE_TIME_RIGHT_FAST 19
+#define MIDI_NOTE_SAVE_MOVE_LIB   20
 
 /* MIDI NOTE mappings - button row 3 */
 #define MIDI_NOTE_MUSIC_TOGGLE    24
+#define MIDI_NOTE_CLEAR_DECK_B    28
+
+/* MIDI NOTE mappings - button row 4 */
+#define MIDI_NOTE_RANDOM_DECK_B   36
 
 /* Event queue */
 #define EVENT_QUEUE_SIZE 32
@@ -217,6 +222,15 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					case MIDI_NOTE_MUSIC_TOGGLE:
 						ev.id = PLOTTER_ID_MUSIC_TOGGLE;
 						break;
+					case MIDI_NOTE_SAVE_MOVE_LIB:
+						ev.id = PLOTTER_ID_SAVE_MOVE_LIB;
+						break;
+					case MIDI_NOTE_CLEAR_DECK_B:
+						ev.id = PLOTTER_ID_CLEAR_DECK_B;
+						break;
+					case MIDI_NOTE_RANDOM_DECK_B:
+						ev.id = PLOTTER_ID_RANDOM_DECK_B;
+						break;
 					default:
 						ev.type = -1;  /* Unknown button */
 						break;
@@ -256,6 +270,15 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					break;
 				case MIDI_NOTE_MUSIC_TOGGLE:
 					ev.id = PLOTTER_ID_MUSIC_TOGGLE;
+					break;
+				case MIDI_NOTE_SAVE_MOVE_LIB:
+					ev.id = PLOTTER_ID_SAVE_MOVE_LIB;
+					break;
+				case MIDI_NOTE_CLEAR_DECK_B:
+					ev.id = PLOTTER_ID_CLEAR_DECK_B;
+					break;
+				case MIDI_NOTE_RANDOM_DECK_B:
+					ev.id = PLOTTER_ID_RANDOM_DECK_B;
 					break;
 				default:
 					ev.type = -1;

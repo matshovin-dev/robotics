@@ -35,6 +35,9 @@
 #define PLOTTER_ID_TIME_RIGHT_FAST 16  /* Step time right 4x (button) */
 #define PLOTTER_ID_REPEAT          17  /* Toggle run repeat (button) */
 #define PLOTTER_ID_MUSIC_TOGGLE    18  /* Toggle music on/off (button) */
+#define PLOTTER_ID_SAVE_MOVE_LIB   19  /* Save move_lib to file (button) */
+#define PLOTTER_ID_CLEAR_DECK_B    20  /* Clear deck B move (button) */
+#define PLOTTER_ID_RANDOM_DECK_B   21  /* Randomize deck B move (button) */
 
 /**
  * struct plotter_event - Input event for plotter

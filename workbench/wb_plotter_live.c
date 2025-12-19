@@ -704,7 +704,14 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 static void init_move_system(void)
 {
 	move_lib_init();
-	move_lib_randomize_range(20, 80, 0.5f);
+
+	/* Last moves fra fil, ellers bruk randomiserte */
+	if (move_lib_load("../assets/moves/move_lib.json") == 0) {
+		printf("Lastet moves fra ../assets/moves/move_lib.json\n");
+	} else {
+		printf("Kunne ikke laste move_lib.json, bruker randomiserte moves\n");
+		move_lib_randomize_range(20, 80, 0.5f);
+	}
 	move_playback_set_bpm(&pb, bpm);
 	pb.master_phase = master_phase;	 // Synk beat-fase
 	T = 1.0f / f0;
@@ -1072,6 +1079,22 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 		case PLOTTER_ID_MUSIC_TOGGLE:
 			music_playing = !music_playing;
 			printf("Music: %s\n", music_playing ? "ON" : "OFF");
+			break;
+		case PLOTTER_ID_SAVE_MOVE_LIB:
+			if (move_lib_save("../assets/moves/move_lib.json") == 0)
+				printf("Saved move_lib to ../assets/moves/move_lib.json\n");
+			else
+				printf("Failed to save move_lib\n");
+			break;
+		case PLOTTER_ID_CLEAR_DECK_B:
+			move_clear(&move_lib[move_no_b]);
+			printf("Cleared move %d (deck B)\n", move_no_b);
+			send_move_bars(move_no_b);
+			break;
+		case PLOTTER_ID_RANDOM_DECK_B:
+			move_randomize(&move_lib[move_no_b], 0.5f);
+			printf("Randomized move %d (deck B)\n", move_no_b);
+			send_move_bars(move_no_b);
 			break;
 		}
 	}
