@@ -83,6 +83,7 @@ int t_is_running = 0;
 int run_repeat = 0;  // Loop playback when reaching end
 float run_loop_start = 0.0f;  // Start of current run loop
 float run_loop_end = 0.0f;    // End of current run loop
+int edit_dof = -1;  // -1 = OFF, 0-5 = DOF for fader editing
 char str[128]; /* tittelbar */
 int viz_sock = -1;
 
@@ -1125,7 +1126,66 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			printf("Run 4 beats: %.2f - %.2f\n", run_loop_start, run_loop_end);
 			break;
 		}
+		case PLOTTER_ID_CYCLE_DOF: {
+			const char *dof_names[] = { "RX", "RY", "RZ", "TX", "TY", "TZ" };
+			edit_dof++;
+			if (edit_dof > 5)
+				edit_dof = -1;
+			if (edit_dof == -1) {
+				printf("Edit DOF: OFF\n");
+				/* Send alle fadere til 0 */
+				float zeros[7] = {0};
+				input_plotter_set_all_faders(zeros);
+			} else {
+				printf("Edit DOF: %s (%d)\n", dof_names[edit_dof], edit_dof);
+				/* Send nåværende parameter-verdier til faderne */
+				struct move *m = &move_lib[move_no_b];
+				float values[7] = {
+					m->dof[edit_dof].h[0].amplitude,
+					m->dof[edit_dof].h[0].phase,
+					m->dof[edit_dof].h[1].amplitude,
+					m->dof[edit_dof].h[1].phase,
+					m->dof[edit_dof].h[2].amplitude,
+					m->dof[edit_dof].h[2].phase,
+					(m->dof[edit_dof].bias + 1.0f) * 0.5f  /* -1..+1 → 0..1 */
+				};
+				input_plotter_set_all_faders(values);
+			}
+			break;
 		}
+		}
+	} else if (ev->type == PLOTTER_FADER) {
+		/* Faders kun aktive når edit_dof er valgt */
+		if (edit_dof < 0 || edit_dof > 5)
+			return;
+
+		struct move *m = &move_lib[move_no_b];
+		int fader_idx = ev->id - PLOTTER_ID_FADER_0;
+
+		switch (fader_idx) {
+		case 0:  /* amp1 */
+			m->dof[edit_dof].h[0].amplitude = ev->value;
+			break;
+		case 1:  /* phase1 */
+			m->dof[edit_dof].h[0].phase = ev->value;
+			break;
+		case 2:  /* amp2 */
+			m->dof[edit_dof].h[1].amplitude = ev->value;
+			break;
+		case 3:  /* phase2 */
+			m->dof[edit_dof].h[1].phase = ev->value;
+			break;
+		case 4:  /* amp3 */
+			m->dof[edit_dof].h[2].amplitude = ev->value;
+			break;
+		case 5:  /* phase3 */
+			m->dof[edit_dof].h[2].phase = ev->value;
+			break;
+		case 6:  /* bias: 0-1 → -1 to +1 */
+			m->dof[edit_dof].bias = ev->value * 2.0f - 1.0f;
+			break;
+		}
+		send_move_bars(move_no_b);
 	}
 }
 

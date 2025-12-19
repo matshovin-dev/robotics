@@ -39,6 +39,16 @@
 #define PLOTTER_ID_CLEAR_DECK_B    20  /* Clear deck B move (button) */
 #define PLOTTER_ID_RANDOM_DECK_B   21  /* Randomize deck B move (button) */
 #define PLOTTER_ID_RUN_4_BEATS     22  /* Run 4 beats from next beat (button) */
+#define PLOTTER_ID_CYCLE_DOF       23  /* Cycle through DOFs for fader edit (button) */
+
+/* Fader IDs for parameter editing (CC 90-96) */
+#define PLOTTER_ID_FADER_0         30  /* amp1 */
+#define PLOTTER_ID_FADER_1         31  /* phase1 */
+#define PLOTTER_ID_FADER_2         32  /* amp2 */
+#define PLOTTER_ID_FADER_3         33  /* phase2 */
+#define PLOTTER_ID_FADER_4         34  /* amp3 */
+#define PLOTTER_ID_FADER_5         35  /* phase3 */
+#define PLOTTER_ID_FADER_6         36  /* bias */
 
 /**
  * struct plotter_event - Input event for plotter
@@ -98,5 +108,19 @@ int input_plotter_set_lcd(int display, int color,
  * input_plotter_clear_all_lcd - Clear all 8 LCD displays
  */
 void input_plotter_clear_all_lcd(void);
+
+/**
+ * input_plotter_set_fader - Set motorized fader position
+ * @fader: Fader number 0-6
+ * @value: Position 0.0-1.0
+ * Returns 0 on success, -1 on error.
+ */
+int input_plotter_set_fader(int fader, float value);
+
+/**
+ * input_plotter_set_all_faders - Set all 7 fader positions
+ * @values: Array of 7 floats (0.0-1.0)
+ */
+void input_plotter_set_all_faders(const float *values);
 
 #endif /* INPUT_PLOTTER_H */

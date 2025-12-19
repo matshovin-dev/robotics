@@ -38,12 +38,22 @@
 #define MIDI_CC_TRANS_LEN     86
 #define MIDI_CC_TRANS_TYPE    87
 
+/* MIDI CC mappings - bottom row faders */
+#define MIDI_CC_FADER_0       70
+#define MIDI_CC_FADER_1       71
+#define MIDI_CC_FADER_2       72
+#define MIDI_CC_FADER_3       73
+#define MIDI_CC_FADER_4       74
+#define MIDI_CC_FADER_5       75
+#define MIDI_CC_FADER_6       76
+
 /* MIDI NOTE mappings - button row 1 */
 #define MIDI_NOTE_RUN         8
 #define MIDI_NOTE_SPLINE_MODE 9
 #define MIDI_NOTE_TIME_LEFT   10
 #define MIDI_NOTE_TIME_RIGHT  11
 #define MIDI_NOTE_SAVE        12
+#define MIDI_NOTE_CYCLE_DOF   15
 
 /* MIDI NOTE mappings - button row 2 */
 #define MIDI_NOTE_REPEAT          16
@@ -181,6 +191,42 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					ev.id = PLOTTER_ID_TRANS_TYPE;
 					ev.value = encoder_delta(value);
 					break;
+				/* Faders - absolute value 0-127 → 0.0-1.0 */
+				case MIDI_CC_FADER_0:
+					ev.type = PLOTTER_FADER;
+					ev.id = PLOTTER_ID_FADER_0;
+					ev.value = value / 127.0f;
+					break;
+				case MIDI_CC_FADER_1:
+					ev.type = PLOTTER_FADER;
+					ev.id = PLOTTER_ID_FADER_1;
+					ev.value = value / 127.0f;
+					break;
+				case MIDI_CC_FADER_2:
+					ev.type = PLOTTER_FADER;
+					ev.id = PLOTTER_ID_FADER_2;
+					ev.value = value / 127.0f;
+					break;
+				case MIDI_CC_FADER_3:
+					ev.type = PLOTTER_FADER;
+					ev.id = PLOTTER_ID_FADER_3;
+					ev.value = value / 127.0f;
+					break;
+				case MIDI_CC_FADER_4:
+					ev.type = PLOTTER_FADER;
+					ev.id = PLOTTER_ID_FADER_4;
+					ev.value = value / 127.0f;
+					break;
+				case MIDI_CC_FADER_5:
+					ev.type = PLOTTER_FADER;
+					ev.id = PLOTTER_ID_FADER_5;
+					ev.value = value / 127.0f;
+					break;
+				case MIDI_CC_FADER_6:
+					ev.type = PLOTTER_FADER;
+					ev.id = PLOTTER_ID_FADER_6;
+					ev.value = value / 127.0f;
+					break;
 				default:
 					ev.type = -1;  /* Unknown CC */
 					break;
@@ -210,6 +256,9 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 						break;
 					case MIDI_NOTE_SAVE:
 						ev.id = PLOTTER_ID_SAVE;
+						break;
+					case MIDI_NOTE_CYCLE_DOF:
+						ev.id = PLOTTER_ID_CYCLE_DOF;
 						break;
 					case MIDI_NOTE_TIME_LEFT_FAST:
 						ev.id = PLOTTER_ID_TIME_LEFT_FAST;
@@ -262,6 +311,9 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					break;
 				case MIDI_NOTE_SAVE:
 					ev.id = PLOTTER_ID_SAVE;
+					break;
+				case MIDI_NOTE_CYCLE_DOF:
+					ev.id = PLOTTER_ID_CYCLE_DOF;
 					break;
 				case MIDI_NOTE_TIME_LEFT_FAST:
 					ev.id = PLOTTER_ID_TIME_LEFT_FAST;
@@ -538,5 +590,45 @@ void input_plotter_clear_all_lcd(void)
 {
 	for (int i = 0; i < 8; i++) {
 		input_plotter_set_lcd(i, LCD_COLOR_OFF, "", "");
+	}
+}
+
+int input_plotter_set_fader(int fader, float value)
+{
+	if (!initialized || !midi_dest)
+		return -1;
+
+	if (fader < 0 || fader > 6)
+		return -1;
+
+	/* Clamp value to 0-1 and convert to 0-127 */
+	if (value < 0.0f) value = 0.0f;
+	if (value > 1.0f) value = 1.0f;
+	Byte midi_value = (Byte)(value * 127.0f);
+
+	/* CC message: status, cc number, value */
+	Byte cc_msg[3] = {
+		0xB0,  /* Control Change, channel 0 */
+		(Byte)(MIDI_CC_FADER_0 + fader),
+		midi_value
+	};
+
+	/* Send via CoreMIDI */
+	Byte buffer[64];
+	MIDIPacketList *pktlist = (MIDIPacketList *)buffer;
+	MIDIPacket *pkt = MIDIPacketListInit(pktlist);
+	pkt = MIDIPacketListAdd(pktlist, sizeof(buffer), pkt, 0, 3, cc_msg);
+
+	if (!pkt)
+		return -1;
+
+	OSStatus status = MIDISend(midi_output_port, midi_dest, pktlist);
+	return (status == noErr) ? 0 : -1;
+}
+
+void input_plotter_set_all_faders(const float *values)
+{
+	for (int i = 0; i < 7; i++) {
+		input_plotter_set_fader(i, values[i]);
 	}
 }
