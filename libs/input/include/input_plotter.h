@@ -33,6 +33,8 @@
 #define PLOTTER_ID_SAVE            14  /* Save current segment (button) */
 #define PLOTTER_ID_TIME_LEFT_FAST  15  /* Step time left 4x (button) */
 #define PLOTTER_ID_TIME_RIGHT_FAST 16  /* Step time right 4x (button) */
+#define PLOTTER_ID_REPEAT          17  /* Toggle run repeat (button) */
+#define PLOTTER_ID_MUSIC_TOGGLE    18  /* Toggle music on/off (button) */
 
 /**
  * struct plotter_event - Input event for plotter

@@ -80,6 +80,7 @@ int move_no_a = 4;
 int move_no_b = 21;
 float t_current = 1.0f;	 // sec
 int t_is_running = 0;
+int run_repeat = 0;  // Loop playback when reaching end
 char str[128]; /* tittelbar */
 int viz_sock = -1;
 
@@ -409,8 +410,9 @@ void audio_callback(void *userdata, Uint8 *stream, int len)
 			beep_samples_remaining--;
 		}
 
-		/* Musikk - kun når playing */
-		if (music_playing && music_samples && music_playback_pos >= 0 &&
+		/* Musikk - kun når running OG playing */
+		if (t_is_running && music_playing && music_samples &&
+		    music_playback_pos >= 0 &&
 		    music_playback_pos < music_sample_count) {
 			music_out = music_samples[music_playback_pos] *
 				    music_volume;
@@ -805,7 +807,6 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		t_current = t_start;
 		audio_time = t_start;
 		music_sync_request = 1;
-		music_playing = 1;
 		spline_initialized = 0;
 		move_playback_reset(&pb);
 		pb.master_phase = master_phase;
@@ -1015,7 +1016,6 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			t_current = t_start;
 			audio_time = t_start;
 			music_sync_request = 1;
-			music_playing = 1;
 			spline_initialized = 0;
 			move_playback_reset(&pb);
 			pb.master_phase = master_phase;
@@ -1064,6 +1064,14 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			send_mixed_pose_at_time(t_current);
 			check_beep_at_time(t_current);
 			update_title(window);
+			break;
+		case PLOTTER_ID_REPEAT:
+			run_repeat = !run_repeat;
+			printf("Repeat: %s\n", run_repeat ? "ON" : "OFF");
+			break;
+		case PLOTTER_ID_MUSIC_TOGGLE:
+			music_playing = !music_playing;
+			printf("Music: %s\n", music_playing ? "ON" : "OFF");
 			break;
 		}
 	}
@@ -1120,8 +1128,17 @@ static void update_playback(float delta_time, SDL_Window *window)
 	t_current += delta_time;
 
 	if (t_current > t_end) {
-		t_is_running = 0;
-		music_playing = 0;
+		if (run_repeat) {
+			t_current = t_start;
+			audio_time = t_start;
+			music_sync_request = 1;
+			spline_initialized = 0;
+			move_playback_reset(&pb);
+			pb.master_phase = master_phase;
+			last_move_phase = move_phase_1(&pb);
+		} else {
+			t_is_running = 0;
+		}
 	}
 }
 

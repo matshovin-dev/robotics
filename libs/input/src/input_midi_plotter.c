@@ -45,9 +45,13 @@
 #define MIDI_NOTE_TIME_RIGHT  11
 #define MIDI_NOTE_SAVE        12
 
-/* MIDI NOTE mappings - button row 2 (fast time step) */
+/* MIDI NOTE mappings - button row 2 */
+#define MIDI_NOTE_REPEAT          16
 #define MIDI_NOTE_TIME_LEFT_FAST  18
 #define MIDI_NOTE_TIME_RIGHT_FAST 19
+
+/* MIDI NOTE mappings - button row 3 */
+#define MIDI_NOTE_MUSIC_TOGGLE    24
 
 /* Event queue */
 #define EVENT_QUEUE_SIZE 32
@@ -207,6 +211,12 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					case MIDI_NOTE_TIME_RIGHT_FAST:
 						ev.id = PLOTTER_ID_TIME_RIGHT_FAST;
 						break;
+					case MIDI_NOTE_REPEAT:
+						ev.id = PLOTTER_ID_REPEAT;
+						break;
+					case MIDI_NOTE_MUSIC_TOGGLE:
+						ev.id = PLOTTER_ID_MUSIC_TOGGLE;
+						break;
 					default:
 						ev.type = -1;  /* Unknown button */
 						break;
@@ -240,6 +250,12 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					break;
 				case MIDI_NOTE_TIME_RIGHT_FAST:
 					ev.id = PLOTTER_ID_TIME_RIGHT_FAST;
+					break;
+				case MIDI_NOTE_REPEAT:
+					ev.id = PLOTTER_ID_REPEAT;
+					break;
+				case MIDI_NOTE_MUSIC_TOGGLE:
+					ev.id = PLOTTER_ID_MUSIC_TOGGLE;
 					break;
 				default:
 					ev.type = -1;
