@@ -102,7 +102,9 @@ float t_inc_manual = 0.01f;
 static void update_transition_times(void)
 {
 	float beat_duration = 60.0f / bpm;
-	t_mix_start = transition_start_beat * beat_duration;
+	float phase_offset = (master_phase / (2.0f * M_PI)) * beat_duration;
+	float beep_offset = (3.0f / 4.0f) * beat_duration;  /* 270° = 3/4 beat */
+	t_mix_start = transition_start_beat * beat_duration - phase_offset + beep_offset;
 	t_mix_end = t_mix_start + transition_beats * beat_duration;
 }
 
@@ -908,6 +910,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		if (master_phase < 0.0f)
 			master_phase += 2.0f * M_PI;
 		pb.master_phase = master_phase;
+		update_transition_times();
 		update_title(window);
 		break;
 	case SDLK_o:
@@ -948,6 +951,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			if (master_phase < 0.0f)
 				master_phase += 2.0f * M_PI;
 			pb.master_phase = master_phase;
+			update_transition_times();
 			update_title(window);
 			break;
 		case PLOTTER_ID_PHASE_FINE:
@@ -957,6 +961,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			if (master_phase < 0.0f)
 				master_phase += 2.0f * M_PI;
 			pb.master_phase = master_phase;
+			update_transition_times();
 			update_title(window);
 			break;
 		case PLOTTER_ID_BPM:
