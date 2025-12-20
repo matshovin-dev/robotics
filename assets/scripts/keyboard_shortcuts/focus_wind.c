@@ -32,12 +32,13 @@ enum {
 };
 
 // Bundle IDs for apper (index mapper til numpad-taster via enum)
+// Bruk semikolon for å fokusere flere vinduer samtidig: "win:A;win:B;win:C"
 static const char *apps[NP_COUNT] = { [NP_0] = "com.microsoft.VSCode",
 				      [NP_1] = NULL,
 				      [NP_2] = NULL,
 				      [NP_3] = NULL,
 				      [NP_4] = NULL,
-				      [NP_5] = "win:Ste",
+				      [NP_5] = "win:C:;win:B:;win:Ste",
 				      [NP_6] = "win:C:",
 				      [NP_7] = NULL,
 				      [NP_8] = NULL,
@@ -338,7 +339,7 @@ static void list_all_windows(void)
 	CFRelease(apps);
 }
 
-static void activate_app(const char *target)
+static void activate_single_target(const char *target)
 {
 	pid_t pid = 0;
 
@@ -363,6 +364,20 @@ static void activate_app(const char *target)
 		activate_by_pid(pid);
 	} else {
 		printf("  Fant ikke target!\n");
+	}
+}
+
+// Aktiverer ett eller flere targets (semikolon-separert)
+static void activate_app(const char *targets)
+{
+	char buf[512];
+	strncpy(buf, targets, sizeof(buf) - 1);
+	buf[sizeof(buf) - 1] = '\0';
+
+	char *token = strtok(buf, ";");
+	while (token != NULL) {
+		activate_single_target(token);
+		token = strtok(NULL, ";");
 	}
 }
 
@@ -408,13 +423,14 @@ static CGEventRef event_callback(CGEventTapProxy proxy, CGEventType type,
 int main(void)
 {
 	printf("Focus Window - Tastatur-mapper\n");
-	printf("Numpad: 1=VSCode, 2=Terminal, 3=Chrome, 4=Finder\n");
-	printf("        0,5-9,+,-,*,/,=,.,Enter,Clear = ledig\n");
+	printf("Numpad: 0=VSCode, 5=C:/B:/Ste vinduer, 6=C: vindu\n");
+	printf("        -=Finder, *=Firefox, .=Terminal, ==Zen\n");
 	printf("Tastatur: Ctrl+1-4 (samme som over)\n");
 	printf("\nTarget-format i apps[]:\n");
 	printf("  \"com.app.bundle\"     - Bundle ID\n");
 	printf("  \"proc:programnavn\"   - Prosessnavn\n");
 	printf("  \"win:vindustittel\"   - Vindustittel\n");
+	printf("  \"a;b;c\"              - Flere targets samtidig\n");
 	printf("\nCtrl+C for å avslutte\n");
 
 	list_all_windows();

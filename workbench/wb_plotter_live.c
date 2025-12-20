@@ -45,6 +45,10 @@ void draw_grid(SDL_Renderer *renderer);
  * Fil:
  * master_phase move_a_nr move_b_nr fad_start fad_end fad_type
  * master_phase move_a_nr move_b_nr fad_start fad_end fad_type
+ *
+ * Start:
+ * ./wb_plotter_live 0 16
+ * /Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav
  */
 
 // Tidsintervall (kan overstyres med kommandolinje)
@@ -82,7 +86,7 @@ float t_current = 1.0f;	 // sec
 int t_is_running = 0;
 int run_repeat = 0;  // Loop playback when reaching end
 float run_loop_start = 0.0f;  // Start of current run loop
-float run_loop_end = 0.0f;    // End of current run loop
+float run_loop_end = 0.0f;  // End of current run loop
 int edit_dof = -1;  // -1 = OFF, 0-5 = DOF for fader editing
 char str[128]; /* tittelbar */
 int viz_sock = -1;
@@ -262,7 +266,8 @@ static void send_move_bars(int move_no)
 		values[idx++] = (m->dof[dof].bias + 1.0f) * 0.5f;
 	}
 
-	viz_sender_send_move_bars(viz_sock, move_no, values, VIZ_PORT_MOVE_BARS);
+	viz_sender_send_move_bars(viz_sock, move_no, values,
+				  VIZ_PORT_MOVE_BARS);
 }
 
 /* Oppdater tittelbar med alle parametre */
@@ -738,7 +743,7 @@ static void init_move_system(void)
 	if (viz_sock < 0)
 		printf("Advarsel: Kunne ikke opprette viz socket\n");
 	else
-		send_move_bars(move_no_a);  /* Send initial move */
+		send_move_bars(move_no_a); /* Send initial move */
 
 	if (input_plotter_init() < 0) {
 		printf("Advarsel: MIDI ikke tilgjengelig\n");
@@ -1123,22 +1128,26 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			move_playback_reset(&pb);
 			pb.master_phase = master_phase;
 			last_move_phase = move_phase_1(&pb);
-			printf("Run 4 beats: %.2f - %.2f\n", run_loop_start, run_loop_end);
+			printf("Run 4 beats: %.2f - %.2f\n", run_loop_start,
+			       run_loop_end);
 			break;
 		}
 		case PLOTTER_ID_CYCLE_DOF: {
-			const char *dof_names[] = { "RX", "RY", "RZ", "TX", "TY", "TZ" };
+			const char *dof_names[] = { "RX", "RY", "RZ",
+						    "TX", "TY", "TZ" };
 			edit_dof++;
 			if (edit_dof > 5)
 				edit_dof = -1;
 			if (edit_dof == -1) {
 				printf("Edit DOF: OFF\n");
 				/* Send alle fadere til 0 */
-				float zeros[7] = {0};
+				float zeros[7] = { 0 };
 				input_plotter_set_all_faders(zeros);
 			} else {
-				printf("Edit DOF: %s (%d)\n", dof_names[edit_dof], edit_dof);
-				/* Send nåværende parameter-verdier til faderne */
+				printf("Edit DOF: %s (%d)\n",
+				       dof_names[edit_dof], edit_dof);
+				/* Send nåværende parameter-verdier til faderne
+				 */
 				struct move *m = &move_lib[move_no_b];
 				float values[7] = {
 					m->dof[edit_dof].h[0].amplitude,
@@ -1147,7 +1156,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 					m->dof[edit_dof].h[1].phase,
 					m->dof[edit_dof].h[2].amplitude,
 					m->dof[edit_dof].h[2].phase,
-					(m->dof[edit_dof].bias + 1.0f) * 0.5f  /* -1..+1 → 0..1 */
+					(m->dof[edit_dof].bias + 1.0f) * 0.5f /* -1..+1 → 0..1 */
 				};
 				input_plotter_set_all_faders(values);
 			}
@@ -1163,25 +1172,25 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 		int fader_idx = ev->id - PLOTTER_ID_FADER_0;
 
 		switch (fader_idx) {
-		case 0:  /* amp1 */
+		case 0: /* amp1 */
 			m->dof[edit_dof].h[0].amplitude = ev->value;
 			break;
-		case 1:  /* phase1 */
+		case 1: /* phase1 */
 			m->dof[edit_dof].h[0].phase = ev->value;
 			break;
-		case 2:  /* amp2 */
+		case 2: /* amp2 */
 			m->dof[edit_dof].h[1].amplitude = ev->value;
 			break;
-		case 3:  /* phase2 */
+		case 3: /* phase2 */
 			m->dof[edit_dof].h[1].phase = ev->value;
 			break;
-		case 4:  /* amp3 */
+		case 4: /* amp3 */
 			m->dof[edit_dof].h[2].amplitude = ev->value;
 			break;
-		case 5:  /* phase3 */
+		case 5: /* phase3 */
 			m->dof[edit_dof].h[2].phase = ev->value;
 			break;
-		case 6:  /* bias: 0-1 → -1 to +1 */
+		case 6: /* bias: 0-1 → -1 to +1 */
 			m->dof[edit_dof].bias = ev->value * 2.0f - 1.0f;
 			break;
 		}
