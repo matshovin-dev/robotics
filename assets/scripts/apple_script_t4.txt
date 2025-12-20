@@ -1,4 +1,5 @@
 set folderPaths to {"/Users/matsmac/vsCode/robotics/assets/scripts/keyboard_shortcuts", "/Users/matsmac/vsCode/robotics/viz-modules/plot_move_bars", "/Users/matsmac/vsCode/robotics/viz-modules/plot_stw_obj", "/Users/matsmac/vsCode/robotics/workbench", "/Users/matsmac/vsCode/robotics", "/Users/matsmac/vsCode/robotics/workbench", "/Users/matsmac/vsCode/robotics/workbench"}
+set winTitles to {"term1", "term2", "term3", "term4", "term5", "term6", "G: term7"}
 
 set winWidth to 600
 set winHeight to 170
@@ -14,6 +15,7 @@ tell application "Terminal"
 	repeat with i from 1 to 7
 		do script "cd " & quoted form of (item i of folderPaths) & " && clear"
 		delay 0.3
+		set custom title of front window to (item i of winTitles)
 		set yStart to menuBar + ((i - 1) * winHeight)
 		set bounds of front window to {0, yStart, winWidth, yStart + winHeight}
 	end repeat

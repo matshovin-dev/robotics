@@ -47,8 +47,8 @@ void draw_grid(SDL_Renderer *renderer);
  * master_phase move_a_nr move_b_nr fad_start fad_end fad_type
  *
  * Start:
- * ./wb_plotter_live 0 16
- * /Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav
+ * ./wb_plotter_live 0
+ * 16/Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav
  */
 
 // Tidsintervall (kan overstyres med kommandolinje)
@@ -135,6 +135,12 @@ const char *spline_names[] = {
 /* Koreografi-fil */
 const char *choreo_filename = "choreo.json";
 int segment_count = 0;
+
+float master_phase_to_seconds(float phase, int bpm)
+{
+	float beat_duration = 60.0f / bpm;
+	return (phase / (2.0f * M_PI)) * beat_duration;
+}
 
 /* Lagre segment til koreografi-fil */
 static void save_segment(void)
@@ -273,9 +279,15 @@ static void send_move_bars(int move_no)
 /* Oppdater tittelbar med alle parametre */
 static void update_title(SDL_Window *window)
 {
-	snprintf(str, sizeof(str), "Phase:%.0f BPM:%d A:%d B:%d %s%d @%d+%d",
-		 master_phase * 180.0f / M_PI, bpm, move_no_a, move_no_b,
-		 spline_active ? "S" : "F",
+	float beat_duration = 60.0f / bpm;
+	float phase_beats = master_phase / (2.0f * M_PI);
+	int beat_no = (int)((t_current / beat_duration) + phase_beats - 0.75f);
+
+	snprintf(str, sizeof(str),
+		 "C: t: %.2f b: %d    Phase: %.0f BPM: %d       %d / %d     "
+		 " %s %d      StartBeat: %d  LengthBeat: %d",
+		 t_current, beat_no, master_phase * 180.0f / M_PI, bpm,
+		 move_no_a, move_no_b, spline_active ? "Spline " : "Fade ",
 		 spline_active ? current_spline_type : current_fade_index,
 		 transition_start_beat, transition_beats);
 	SDL_SetWindowTitle(window, str);
