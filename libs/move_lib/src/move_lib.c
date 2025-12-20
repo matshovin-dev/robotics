@@ -18,6 +18,10 @@
 
 #define TWO_PI (2.0f * M_PI)
 
+/* Phase alignment constants - aligner bunn av 0.5 og 0.25 harmoniske med 1.0 */
+#define PHASE_ALIGN_05 (3.0f * M_PI / 4.0f) /* 3π/4 */
+#define PHASE_ALIGN_025 (9.0f * M_PI / 8.0f) /* 9π/8 */
+
 /*
  * Global state
  */
@@ -39,6 +43,9 @@ struct move_playback move_playback = {
 
 /*
  * Phase functions, ut: 0 - 2π
+ * PHASE_ALIGN brukes for å justere fase slik at bunn av 1 og 0.5 og 0.25
+ * harmoniske aligner
+ * Ellers huske på linær fase / konst gruppedealy
  */
 float move_phase_1(const struct move_playback *pb)
 {
@@ -50,7 +57,7 @@ float move_phase_05(const struct move_playback *pb)
 {
 	float beats_per_sec = pb->bpm / 60.0f;
 	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.5f +
-			     pb->master_phase * 0.5f,
+			     pb->master_phase * 0.5f + PHASE_ALIGN_05,
 		     TWO_PI);
 }
 
@@ -58,7 +65,7 @@ float move_phase_025(const struct move_playback *pb)
 {
 	float beats_per_sec = pb->bpm / 60.0f;
 	return fmodf(TWO_PI * pb->t * beats_per_sec * 0.25f +
-			     pb->master_phase * 0.25f,
+			     pb->master_phase * 0.25f + PHASE_ALIGN_025,
 		     TWO_PI);
 }
 
@@ -1028,14 +1035,31 @@ void move_lib_init(void)
 static const char *dof_names[MOVE_NUM_DOFS] = { "rx", "ry", "rz",
 						"tx", "ty", "tz" };
 
+/* Check if a move has any actual data */
+static int move_has_data(const struct move *m)
+{
+	if (m->name[0] != '\0' || m->flags != 0)
+		return 1;
+
+	for (int d = 0; d < MOVE_NUM_DOFS; d++) {
+		if (m->dof[d].bias != 0.0f)
+			return 1;
+		for (int h = 0; h < MOVE_NUM_HARMONICS; h++) {
+			if (m->dof[d].h[h].amplitude != 0.0f)
+				return 1;
+		}
+	}
+	return 0;
+}
+
 int move_lib_save(const char *path)
 {
 	cJSON *root = cJSON_CreateObject();
 	cJSON *moves = cJSON_CreateArray();
 
 	for (int i = 0; i < MOVE_LIB_SIZE; i++) {
-		/* Skip empty moves (no name and all zeros) */
-		if (move_lib[i].name[0] == '\0' && move_lib[i].flags == 0)
+		/* Skip moves with no data */
+		if (!move_has_data(&move_lib[i]))
 			continue;
 
 		cJSON *move = cJSON_CreateObject();
