@@ -64,6 +64,7 @@
 /* MIDI NOTE mappings - button row 3 */
 #define MIDI_NOTE_MUSIC_TOGGLE    24
 #define MIDI_NOTE_CLEAR_DECK_B    28
+#define MIDI_NOTE_PHASE_SHIFT_B   31
 
 /* MIDI NOTE mappings - button row 4 */
 #define MIDI_NOTE_RUN_4_BEATS     32
@@ -284,6 +285,9 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					case MIDI_NOTE_RANDOM_DECK_B:
 						ev.id = PLOTTER_ID_RANDOM_DECK_B;
 						break;
+					case MIDI_NOTE_PHASE_SHIFT_B:
+						ev.id = PLOTTER_ID_PHASE_SHIFT_B;
+						break;
 					default:
 						ev.type = -1;  /* Unknown button */
 						break;
@@ -338,6 +342,9 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					break;
 				case MIDI_NOTE_RANDOM_DECK_B:
 					ev.id = PLOTTER_ID_RANDOM_DECK_B;
+					break;
+				case MIDI_NOTE_PHASE_SHIFT_B:
+					ev.id = PLOTTER_ID_PHASE_SHIFT_B;
 					break;
 				default:
 					ev.type = -1;

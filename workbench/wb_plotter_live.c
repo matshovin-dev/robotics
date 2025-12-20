@@ -1079,7 +1079,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			save_segment();
 			break;
 		case PLOTTER_ID_TIME_LEFT_FAST:
-			t_current -= t_inc_manual * 4.0f;
+			t_current -= t_inc_manual * 12.0f;
 			if (t_current < t_start)
 				t_current = t_start;
 			audio_time = t_current;
@@ -1088,7 +1088,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			update_title(window);
 			break;
 		case PLOTTER_ID_TIME_RIGHT_FAST:
-			t_current += t_inc_manual * 4.0f;
+			t_current += t_inc_manual * 12.0f;
 			if (t_current > t_end)
 				t_current = t_end;
 			audio_time = t_current;
@@ -1120,6 +1120,21 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			printf("Randomized move %d (deck B)\n", move_no_b);
 			send_move_bars(move_no_b);
 			break;
+		case PLOTTER_ID_PHASE_SHIFT_B: {
+			/* Shift alle faser i deck B for å flytte kurveform
+			 * uten å endre form. h[0] er raskest (1 beat),
+			 * h[1] er 0.5 beat, h[2] er langsomst (0.25 beat).
+			 * Forholdet 4:2:1 gir samme tidsforskyvning. */
+			struct move *m = &move_lib[move_no_b];
+			for (int d = 0; d < MOVE_NUM_DOFS; d++) {
+				m->dof[d].h[0].phase = fmodf(m->dof[d].h[0].phase + 0.5f, 1.0f);
+				m->dof[d].h[1].phase = fmodf(m->dof[d].h[1].phase + 0.25f, 1.0f);
+				m->dof[d].h[2].phase = fmodf(m->dof[d].h[2].phase + 0.125f, 1.0f);
+			}
+			printf("Phase shifted move %d (deck B)\n", move_no_b);
+			send_move_bars(move_no_b);
+			break;
+		}
 		case PLOTTER_ID_RUN_4_BEATS: {
 			/* Finn nærmeste beat opp i tid */
 			float beat_dur = 60.0f / bpm;
