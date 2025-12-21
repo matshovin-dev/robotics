@@ -12,12 +12,16 @@ BUILD_DIR = build
 CJSON_SRC = ../../libs/song_lib/vendor/cJSON.c
 CJSON_OBJ = $(BUILD_DIR)/cJSON.o
 
+# UDP source
+UDP_SRC = ../common/src/udp.c
+UDP_OBJ = $(BUILD_DIR)/udp.o
+
 # Main visualizer source
 VIZ_SRC = src/main.c
 VIZ_OBJ = $(BUILD_DIR)/main.o
 
 # All objects
-OBJ = $(CJSON_OBJ) $(VIZ_OBJ)
+OBJ = $(CJSON_OBJ) $(UDP_OBJ) $(VIZ_OBJ)
 
 # Default target
 all: plot_move_lib
@@ -27,6 +31,10 @@ plot_move_lib: $(OBJ)
 
 # Build cJSON object
 $(BUILD_DIR)/cJSON.o: $(CJSON_SRC) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Build UDP object
+$(BUILD_DIR)/udp.o: $(UDP_SRC) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Build main visualizer object

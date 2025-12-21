@@ -31,5 +31,6 @@
 #define VIZ_PORT_SCOPE 9004 /* Oscilloscope-style DOF plot */
 #define VIZ_PORT_PHASE 9005 /* Phase/beat visualization */
 #define VIZ_PORT_MOVE_BARS 9010 /* Move parameter bar plot */
+#define VIZ_PORT_MOVE_LIB 9011 /* Full move library plot */
 
 #endif /* VIZ_PORTS_H */

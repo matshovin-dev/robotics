@@ -439,6 +439,34 @@ static void send_move_bars(int move_no)
 				  VIZ_PORT_MOVE_BARS);
 }
 
+/* Send hele move library til plot_move_lib */
+static void send_move_lib(void)
+{
+	if (viz_sock < 0)
+		return;
+
+	float values[4200];  /* 100 moves x 42 params */
+
+	for (int m = 0; m < 100; m++) {
+		const struct move *mov = &move_lib[m];
+		int base = m * 42;
+
+		for (int dof = 0; dof < 6; dof++) {
+			int dof_base = base + dof * 7;
+			values[dof_base + 0] = mov->dof[dof].h[0].amplitude;
+			values[dof_base + 1] = mov->dof[dof].h[0].phase;
+			values[dof_base + 2] = mov->dof[dof].h[1].amplitude;
+			values[dof_base + 3] = mov->dof[dof].h[1].phase;
+			values[dof_base + 4] = mov->dof[dof].h[2].amplitude;
+			values[dof_base + 5] = mov->dof[dof].h[2].phase;
+			values[dof_base + 6] = (mov->dof[dof].bias + 1.0f) * 0.5f;
+		}
+	}
+
+	viz_sender_send_move_lib(viz_sock, move_no_a, move_no_b, edit_dof,
+				 values, VIZ_PORT_MOVE_LIB);
+}
+
 /* Oppdater tittelbar med alle parametre */
 static void update_title(SDL_Window *window)
 {
@@ -992,8 +1020,10 @@ static void init_move_system(void)
 	viz_sock = viz_sender_create();
 	if (viz_sock < 0)
 		printf("Advarsel: Kunne ikke opprette viz socket\n");
-	else
+	else {
 		send_move_bars(move_no_a); /* Send initial move */
+		send_move_lib(); /* Send hele move library */
+	}
 
 	if (input_plotter_init() < 0) {
 		printf("Advarsel: MIDI ikke tilgjengelig\n");
@@ -1232,6 +1262,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			move_mixer.deck_a = move_no_a;
 			update_title(window);
 			send_move_bars(move_no_a);
+			send_move_lib();
 			break;
 		case PLOTTER_ID_MOVE_B:
 			move_no_b += (int)ev->value;
@@ -1243,6 +1274,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			move_mixer.deck_b = move_no_b;
 			update_title(window);
 			send_move_bars(move_no_b);
+			send_move_lib();
 			break;
 		case PLOTTER_ID_TRANS_START:
 			transition_start_beat += (int)ev->value;
@@ -1467,6 +1499,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 				};
 				input_plotter_set_all_faders(values);
 			}
+			send_move_lib();
 			break;
 		}
 		case PLOTTER_ID_SEGMENT_DOWN:
@@ -1590,6 +1623,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			break;
 		}
 		send_move_bars(move_no_b);
+		send_move_lib();
 	}
 }
 

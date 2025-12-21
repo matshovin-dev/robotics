@@ -1,18 +1,23 @@
 /**
  * @file main.c
- * @brief Static move library visualizer
+ * @brief Move library visualizer with UDP updates
  *
  * Displays all 100 moves (5 columns x 20 rows) with bar plots.
  * Each move shows 42 parameters (6 DOFs x 7 params).
  * Bar width: 5px, max height: 20px.
  *
- * Usage: ./plot_move_lib [move_lib.json]
+ * Can load from JSON file and/or receive UDP updates.
+ *
+ * Usage: ./plot_move_lib [move_lib.json] [port]
  */
 
+#include "viz_protocol.h"
+#include "udp.h"
 #include <GLFW/glfw3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include "cJSON.h"
 
 /* Layout constants */
@@ -49,7 +54,11 @@ struct move_params {
 
 static struct move_params moves[NUM_MOVES];
 static int num_moves_loaded = 0;
-static char current_filename[512] = "../assets/moves/move_lib.json";
+static char current_filename[512] = "../../assets/moves/move_lib.json";
+static int udp_sock = -1;
+static int highlight_deck_a = -1;
+static int highlight_deck_b = -1;
+static int highlight_edit_dof = -1;
 
 /* Colors for parameters */
 static const float param_colors[7][3] = {
@@ -163,6 +172,34 @@ static int load_move_lib(const char *filename)
 }
 
 /**
+ * poll_udp - Check for UDP packets and update moves
+ */
+static void poll_udp(void)
+{
+	if (udp_sock < 0)
+		return;
+
+	struct viz_move_lib_packet packet;
+	int n = udp_receive(udp_sock, &packet, sizeof(packet));
+
+	if (n == sizeof(packet) &&
+	    packet.magic == VIZ_MAGIC &&
+	    packet.type == VIZ_PACKET_MOVE_LIB) {
+		/* Update highlight info */
+		highlight_deck_a = packet.deck_a;
+		highlight_deck_b = packet.deck_b;
+		highlight_edit_dof = packet.edit_dof;
+
+		/* Copy all values to moves array */
+		for (int m = 0; m < NUM_MOVES; m++) {
+			for (int p = 0; p < BARS_PER_MOVE; p++) {
+				moves[m].values[p] = packet.values[m * BARS_PER_MOVE + p];
+			}
+		}
+	}
+}
+
+/**
  * draw_move - Draw a single move's bars at given position
  */
 static void draw_move(int move_idx, float base_x, float base_y)
@@ -205,6 +242,44 @@ static void draw_move(int move_idx, float base_x, float base_y)
 }
 
 /**
+ * draw_highlight - Draw highlight rectangle behind a move (or specific DOF)
+ * @move_idx: move number to highlight
+ * @dof: DOF to highlight (-1 = entire move, 0-5 = specific DOF)
+ * @r, g, b: highlight color
+ */
+static void draw_highlight(int move_idx, int dof, float r, float g, float b)
+{
+	if (move_idx < 0 || move_idx >= NUM_MOVES)
+		return;
+
+	int col = move_idx / ROWS;
+	int row = move_idx % ROWS;
+
+	float move_base_x = MOVE_GAP_X / 2 + col * CELL_WIDTH;
+	float base_y = WINDOW_HEIGHT - (row + 1) * CELL_HEIGHT + LABEL_HEIGHT - 2;
+	float height = BAR_MAX_HEIGHT + 4;
+
+	float base_x, width;
+	if (dof < 0 || dof > 5) {
+		/* Highlight entire move */
+		base_x = move_base_x - 2;
+		width = MOVE_WIDTH + 4;
+	} else {
+		/* Highlight specific DOF (7 bars + gap before) */
+		base_x = move_base_x + dof * (PARAMS_PER_DOF * BAR_WIDTH + DOF_GAP) - 1;
+		width = PARAMS_PER_DOF * BAR_WIDTH + 2;
+	}
+
+	glColor4f(r, g, b, 0.3f);
+	glBegin(GL_QUADS);
+	glVertex2f(base_x, base_y);
+	glVertex2f(base_x + width, base_y);
+	glVertex2f(base_x + width, base_y + height);
+	glVertex2f(base_x, base_y + height);
+	glEnd();
+}
+
+/**
  * render - Render all moves
  */
 static void render(void)
@@ -217,6 +292,15 @@ static void render(void)
 
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
+
+	/* Enable blending for transparent highlights */
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	/* Draw highlights for deck A (green) and deck B (cyan)
+	 * Deck B uses edit_dof for specific DOF highlight when active */
+	draw_highlight(highlight_deck_a, -1, 0.2f, 0.8f, 0.2f);
+	draw_highlight(highlight_deck_b, highlight_edit_dof, 0.2f, 0.8f, 0.8f);
 
 	/* Draw all moves in grid */
 	for (int row = 0; row < ROWS; row++) {
@@ -232,6 +316,8 @@ static void render(void)
 			draw_move(move_idx, base_x, base_y);
 		}
 	}
+
+	glDisable(GL_BLEND);
 }
 
 /**
@@ -273,24 +359,41 @@ static void key_callback(GLFWwindow *window, int key, int scancode,
 int main(int argc, char *argv[])
 {
 	GLFWwindow *window;
+	int port = VIZ_PORT_MOVE_LIB;
 
-	if (argc > 1)
-		strncpy(current_filename, argv[1], sizeof(current_filename) - 1);
+	/* Parse arguments: [filename] [port] */
+	for (int i = 1; i < argc; i++) {
+		if (argv[i][0] >= '0' && argv[i][0] <= '9') {
+			port = atoi(argv[i]);
+		} else {
+			strncpy(current_filename, argv[i], sizeof(current_filename) - 1);
+		}
+	}
 
 	printf("Move Library Visualizer\n");
 	printf("=======================\n");
 	printf("Layout: %d columns x %d rows = %d moves\n", COLS, ROWS, NUM_MOVES);
 	printf("Window: %d x %d pixels\n", WINDOW_WIDTH, WINDOW_HEIGHT);
-	printf("Bar: %dpx wide, %dpx max height\n\n", BAR_WIDTH, BAR_MAX_HEIGHT);
+	printf("Bar: %dpx wide, %dpx max height\n", BAR_WIDTH, BAR_MAX_HEIGHT);
+	printf("UDP packet size: %lu bytes\n\n", sizeof(struct viz_move_lib_packet));
 
 	/* Initialize moves to zero */
 	memset(moves, 0, sizeof(moves));
 	for (int i = 0; i < NUM_MOVES; i++)
 		moves[i].index = i;
 
-	/* Load move library */
+	/* Load move library from file */
 	if (load_move_lib(current_filename) < 0) {
 		fprintf(stderr, "Warning: Could not load %s\n", current_filename);
+	}
+
+	/* Create UDP receiver */
+	udp_sock = udp_create_receiver(port);
+	if (udp_sock < 0) {
+		fprintf(stderr, "Warning: Could not create UDP receiver on port %d\n", port);
+	} else {
+		printf("Listening on UDP port %d (packet size: %lu bytes)...\n",
+		       port, sizeof(struct viz_move_lib_packet));
 	}
 
 	/* Initialize GLFW */
@@ -316,10 +419,11 @@ int main(int argc, char *argv[])
 	/* Setup OpenGL */
 	glClearColor(0.1f, 0.1f, 0.12f, 1.0f);
 
-	printf("Press ENTER to reload, ESC to exit\n");
+	printf("Press ENTER to reload from file, ESC to exit\n");
 
 	/* Main loop */
 	while (!glfwWindowShouldClose(window)) {
+		poll_udp();
 		render();
 		glfwSwapBuffers(window);
 		glfwPollEvents();
@@ -328,6 +432,8 @@ int main(int argc, char *argv[])
 	/* Cleanup */
 	glfwDestroyWindow(window);
 	glfwTerminate();
+	if (udp_sock >= 0)
+		close(udp_sock);
 
 	return 0;
 }

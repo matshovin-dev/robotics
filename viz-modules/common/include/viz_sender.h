@@ -57,4 +57,20 @@ int viz_send_pose(const struct stewart_pose *pose,
 int viz_sender_send_move_bars(int sock, int move_no, const float *values,
 			      int port);
 
+/**
+ * viz_sender_send_move_lib - Send full move library (100 moves x 42 params)
+ * @sock: UDP socket (fra viz_sender_create)
+ * @deck_a: current move number in deck A (for highlighting)
+ * @deck_b: current move number in deck B (for highlighting)
+ * @edit_dof: active DOF for fader edit (-1 = none, 0-5 = DOF)
+ * @values: array of 4200 floats (0.0-1.0) for all bar heights
+ * @port: destinasjons port (default VIZ_PORT_MOVE_LIB = 9011)
+ *
+ * Sender alle 100 moves i én pakke (~16.8 KB).
+ *
+ * Retur: 0 ved suksess, -1 ved feil
+ */
+int viz_sender_send_move_lib(int sock, int deck_a, int deck_b, int edit_dof,
+			     const float *values, int port);
+
 #endif /* VIZ_SENDER_H */

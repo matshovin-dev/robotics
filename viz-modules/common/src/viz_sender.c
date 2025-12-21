@@ -15,6 +15,12 @@ int viz_sender_create(void)
 		return -1;
 	}
 
+	/* Øk send buffer for store pakker (f.eks. move_lib ~17KB) */
+	int sndbuf = 65536;
+	if (setsockopt(sock, SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)) < 0) {
+		perror("setsockopt SO_SNDBUF");
+	}
+
 	return sock;
 }
 
@@ -93,6 +99,36 @@ int viz_sender_send_move_bars(int sock, int move_no, const float *values,
 
 	if (sent < 0) {
 		perror("sendto");
+		return -1;
+	}
+
+	return 0;
+}
+
+int viz_sender_send_move_lib(int sock, int deck_a, int deck_b, int edit_dof,
+			     const float *values, int port)
+{
+	struct sockaddr_in addr;
+	struct viz_move_lib_packet packet;
+	ssize_t sent;
+
+	packet.magic = VIZ_MAGIC;
+	packet.type = VIZ_PACKET_MOVE_LIB;
+	packet.deck_a = deck_a;
+	packet.deck_b = deck_b;
+	packet.edit_dof = edit_dof;
+	memcpy(packet.values, values, sizeof(packet.values));
+
+	memset(&addr, 0, sizeof(addr));
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(port);
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
+	sent = sendto(sock, &packet, sizeof(packet), 0,
+		      (struct sockaddr *)&addr, sizeof(addr));
+
+	if (sent < 0) {
+		perror("sendto move_lib");
 		return -1;
 	}
 

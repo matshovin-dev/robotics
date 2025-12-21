@@ -69,4 +69,27 @@ struct viz_move_bars_packet {
 	float values[VIZ_MOVE_BARS_COUNT];
 } __attribute__((packed));
 
+/**
+ * struct viz_move_lib_packet - Full move library packet
+ * @magic: magic number (VIZ_MAGIC) for validation
+ * @type: packet type (VIZ_PACKET_MOVE_LIB)
+ * @deck_a: current move number in deck A
+ * @deck_b: current move number in deck B
+ * @values: 4200 float values (100 moves x 42 params)
+ *
+ * Used by plot_move_lib to visualize entire move library.
+ */
+#define VIZ_MOVE_LIB_COUNT 100
+#define VIZ_MOVE_LIB_PARAMS (VIZ_MOVE_LIB_COUNT * VIZ_MOVE_BARS_COUNT)
+#define VIZ_PACKET_MOVE_LIB 4
+
+struct viz_move_lib_packet {
+	uint32_t magic;
+	uint32_t type;
+	uint32_t deck_a;
+	uint32_t deck_b;
+	int32_t edit_dof;  /* -1 = ingen, 0-5 = aktiv DOF for fader-edit */
+	float values[VIZ_MOVE_LIB_PARAMS];
+} __attribute__((packed));
+
 #endif /* VIZ_PROTOCOL_H */

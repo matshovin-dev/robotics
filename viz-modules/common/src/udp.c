@@ -26,6 +26,12 @@ int udp_create_receiver(int port)
 		return -1;
 	}
 
+	/* Øk receive buffer for store pakker (f.eks. move_lib ~17KB) */
+	int rcvbuf = 65536;
+	if (setsockopt(sock, SOL_SOCKET, SO_RCVBUF, &rcvbuf, sizeof(rcvbuf)) < 0) {
+		perror("setsockopt SO_RCVBUF");
+	}
+
 	/* Sett non-blocking */
 	flags = fcntl(sock, F_GETFL, 0);
 	fcntl(sock, F_SETFL, flags | O_NONBLOCK);
