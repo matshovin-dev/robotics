@@ -137,7 +137,22 @@ const char *spline_names[] = {
 
 /* Koreografi-fil */
 const char *choreo_filename = "choreo.json";
-int segment_count = 0;
+
+/* Segment-struktur for koreografi */
+#define MAX_SEGMENTS 20
+#define DEFAULT_SEGMENT_BEAT 180 /* 1.2 min ved 150 bpm - utenfor vindu */
+
+struct choreo_segment {
+	int move_a;
+	int move_b;
+	int trans_type; /* 0=Fade, 1=Spline */
+	int trans_nr; /* fade/spline nummer */
+	int trans_start; /* beat hvor transisjon starter */
+	int trans_len; /* transisjonslengde i beats */
+};
+
+struct choreo_segment segments[MAX_SEGMENTS];
+int current_segment = 0;
 
 float master_phase_to_seconds(float phase, int bpm)
 {
@@ -145,70 +160,214 @@ float master_phase_to_seconds(float phase, int bpm)
 	return (phase / (2.0f * M_PI)) * beat_duration;
 }
 
-/* Lagre segment til koreografi-fil */
-static void save_segment(void)
+/* Initialiser alle segmenter med default-verdier */
+static void init_segments(void)
 {
-	cJSON *root = NULL;
-	cJSON *segments = NULL;
+	for (int i = 0; i < MAX_SEGMENTS; i++) {
+		segments[i].move_a = 0;
+		segments[i].move_b = 1;
+		segments[i].trans_type = 0; /* Fade */
+		segments[i].trans_nr = 0;
+		segments[i].trans_start = DEFAULT_SEGMENT_BEAT;
+		segments[i].trans_len = 4;
+	}
+}
 
-	/* Les eksisterende fil eller opprett ny */
-	FILE *f = fopen(choreo_filename, "r");
-	if (f) {
-		fseek(f, 0, SEEK_END);
-		long len = ftell(f);
-		fseek(f, 0, SEEK_SET);
-		char *data = malloc(len + 1);
-		fread(data, 1, len, f);
-		data[len] = '\0';
-		fclose(f);
-		root = cJSON_Parse(data);
-		free(data);
+/* Last koreografi fra JSON-fil */
+static int load_choreo(const char *filename)
+{
+	FILE *f = fopen(filename, "r");
+	if (!f)
+		return -1;
+
+	fseek(f, 0, SEEK_END);
+	long len = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	char *data = malloc(len + 1);
+	fread(data, 1, len, f);
+	data[len] = '\0';
+	fclose(f);
+
+	cJSON *root = cJSON_Parse(data);
+	free(data);
+	if (!root)
+		return -1;
+
+	/* Les globale verdier */
+	cJSON *bpm_item = cJSON_GetObjectItem(root, "bpm");
+	if (bpm_item)
+		bpm = (int)bpm_item->valuedouble;
+
+	cJSON *phase_item = cJSON_GetObjectItem(root, "master_phase");
+	if (phase_item)
+		master_phase = phase_item->valuedouble * M_PI / 180.0f;
+
+	/* Les segmenter */
+	cJSON *segs = cJSON_GetObjectItem(root, "segments");
+	if (segs) {
+		int count = cJSON_GetArraySize(segs);
+		if (count > MAX_SEGMENTS)
+			count = MAX_SEGMENTS;
+
+		for (int i = 0; i < count; i++) {
+			cJSON *seg = cJSON_GetArrayItem(segs, i);
+			cJSON *item;
+
+			item = cJSON_GetObjectItem(seg, "move_a");
+			if (item)
+				segments[i].move_a = (int)item->valuedouble;
+
+			item = cJSON_GetObjectItem(seg, "move_b");
+			if (item)
+				segments[i].move_b = (int)item->valuedouble;
+
+			item = cJSON_GetObjectItem(seg, "trans_type");
+			if (item) {
+				const char *t = item->valuestring;
+				segments[i].trans_type =
+					(t && t[0] == 'S') ? 1 : 0;
+			}
+
+			item = cJSON_GetObjectItem(seg, "trans_nr");
+			if (item)
+				segments[i].trans_nr = (int)item->valuedouble;
+
+			item = cJSON_GetObjectItem(seg, "trans_start");
+			if (item)
+				segments[i].trans_start =
+					(int)item->valuedouble;
+
+			item = cJSON_GetObjectItem(seg, "trans_len");
+			if (item)
+				segments[i].trans_len = (int)item->valuedouble;
+		}
+		printf("Lastet %d segmenter fra %s\n", count, filename);
 	}
 
-	if (!root) {
-		/* Opprett ny struktur */
-		root = cJSON_CreateObject();
-		cJSON_AddNumberToObject(root, "bpm", bpm);
-		cJSON_AddNumberToObject(root, "master_phase",
-					master_phase * 180.0f / M_PI);
-		segments = cJSON_CreateArray();
-		cJSON_AddItemToObject(root, "segments", segments);
-	} else {
-		/* Oppdater bpm og phase */
-		cJSON *bpm_item = cJSON_GetObjectItem(root, "bpm");
-		if (bpm_item)
-			bpm_item->valuedouble = bpm;
-		cJSON *phase_item = cJSON_GetObjectItem(root, "master_phase");
-		if (phase_item)
-			phase_item->valuedouble = master_phase * 180.0f / M_PI;
-		segments = cJSON_GetObjectItem(root, "segments");
+	cJSON_Delete(root);
+	return 0;
+}
+
+/* Lagre alle segmenter til koreografi-fil */
+static void save_choreo(void)
+{
+	cJSON *root = cJSON_CreateObject();
+	cJSON_AddNumberToObject(root, "bpm", bpm);
+	cJSON_AddNumberToObject(root, "master_phase",
+				master_phase * 180.0f / M_PI);
+
+	cJSON *segs_array = cJSON_CreateArray();
+	for (int i = 0; i < MAX_SEGMENTS; i++) {
+		cJSON *seg = cJSON_CreateObject();
+		cJSON_AddNumberToObject(seg, "move_a", segments[i].move_a);
+		cJSON_AddNumberToObject(seg, "move_b", segments[i].move_b);
+		cJSON_AddStringToObject(seg, "trans_type",
+					segments[i].trans_type ? "S" : "F");
+		cJSON_AddNumberToObject(seg, "trans_nr", segments[i].trans_nr);
+		cJSON_AddNumberToObject(seg, "trans_start",
+					segments[i].trans_start);
+		cJSON_AddNumberToObject(seg, "trans_len",
+					segments[i].trans_len);
+		cJSON_AddItemToArray(segs_array, seg);
 	}
+	cJSON_AddItemToObject(root, "segments", segs_array);
 
-	/* Opprett nytt segment */
-	cJSON *seg = cJSON_CreateObject();
-	cJSON_AddNumberToObject(seg, "move_a", move_no_a);
-	cJSON_AddNumberToObject(seg, "move_b", move_no_b);
-	cJSON_AddStringToObject(seg, "trans_type", spline_active ? "S" : "F");
-	cJSON_AddNumberToObject(seg, "trans_nr",
-				spline_active ? current_spline_type :
-						current_fade_index);
-	cJSON_AddNumberToObject(seg, "trans_start", transition_start_beat);
-	cJSON_AddNumberToObject(seg, "trans_len", transition_beats);
-
-	cJSON_AddItemToArray(segments, seg);
-	segment_count = cJSON_GetArraySize(segments);
-
-	/* Skriv til fil */
 	char *json_str = cJSON_Print(root);
-	f = fopen(choreo_filename, "w");
+	FILE *f = fopen(choreo_filename, "w");
 	if (f) {
 		fprintf(f, "%s\n", json_str);
 		fclose(f);
-		printf("Lagret segment %d til %s\n", segment_count,
+		printf("Lagret %d segmenter til %s\n", MAX_SEGMENTS,
 		       choreo_filename);
 	}
 	free(json_str);
 	cJSON_Delete(root);
+}
+
+/* Finn segment som er aktivt ved gitt beat.
+ * Returnerer segment-index eller -1 hvis ingen er aktiv.
+ * Segmentet er aktivt fra trans_start til trans_start + trans_len */
+static int find_segment_at_beat(int beat)
+{
+	for (int i = 0; i < MAX_SEGMENTS; i++) {
+		int seg_start = segments[i].trans_start;
+		int seg_end = seg_start + segments[i].trans_len;
+		if (beat >= seg_start && beat < seg_end)
+			return i;
+	}
+	return -1;
+}
+
+/* Tilstand ved en gitt tid */
+struct playback_state {
+	int in_transition;      /* 1 hvis i transisjon, 0 ellers */
+	int segment_idx;        /* Aktivt segment (-1 hvis ingen) */
+	int move_no;            /* Move som skal spilles (hvis ikke i transisjon) */
+	float crossfader;       /* 0.0-1.0 (kun gyldig hvis in_transition) */
+};
+
+/* Finn avspillingstilstand ved gitt tid.
+ * Sorterer segmenter etter trans_start og finner riktig tilstand. */
+static struct playback_state get_state_at_time(float t)
+{
+	struct playback_state state = { 0, -1, 0, 0.0f };
+	float beat_duration = 60.0f / bpm;
+
+	/* Finn alle segmenter sortert etter trans_start */
+	int sorted[MAX_SEGMENTS];
+	for (int i = 0; i < MAX_SEGMENTS; i++)
+		sorted[i] = i;
+
+	/* Enkel bubble sort - kun 20 elementer */
+	for (int i = 0; i < MAX_SEGMENTS - 1; i++) {
+		for (int j = 0; j < MAX_SEGMENTS - 1 - i; j++) {
+			if (segments[sorted[j]].trans_start >
+			    segments[sorted[j + 1]].trans_start) {
+				int tmp = sorted[j];
+				sorted[j] = sorted[j + 1];
+				sorted[j + 1] = tmp;
+			}
+		}
+	}
+
+	/* Finn tilstand */
+	int last_completed_seg = -1;
+	for (int i = 0; i < MAX_SEGMENTS; i++) {
+		int idx = sorted[i];
+		float seg_start_t = segments[idx].trans_start * beat_duration;
+		float seg_end_t = seg_start_t +
+				  segments[idx].trans_len * beat_duration;
+
+		/* Skip segmenter som er langt utenfor (ubrukte) */
+		if (segments[idx].trans_start >= DEFAULT_SEGMENT_BEAT)
+			continue;
+
+		if (t >= seg_start_t && t < seg_end_t) {
+			/* Vi er i denne transisjonen */
+			state.in_transition = 1;
+			state.segment_idx = idx;
+			state.crossfader = (t - seg_start_t) /
+					   (seg_end_t - seg_start_t);
+			return state;
+		} else if (t >= seg_end_t) {
+			/* Denne transisjonen er fullført */
+			last_completed_seg = idx;
+		} else if (t < seg_start_t && last_completed_seg == -1) {
+			/* Før første transisjon - bruk denne transisjonens move_a */
+			state.move_no = segments[idx].move_a;
+			return state;
+		}
+	}
+
+	/* Etter siste fullførte transisjon - bruk dens move_b */
+	if (last_completed_seg >= 0) {
+		state.move_no = segments[last_completed_seg].move_b;
+	} else {
+		/* Ingen segmenter i bruk, bruk current_segment */
+		state.move_no = segments[current_segment].move_a;
+	}
+
+	return state;
 }
 
 /* Oppdater LCD med verdier */
@@ -287,10 +446,11 @@ static void update_title(SDL_Window *window)
 	int beat_no = (int)((t_current / beat_duration) + phase_beats - 0.75f);
 
 	snprintf(str, sizeof(str),
-		 "C: t: %.2f b: %d    Phase: %.0f BPM: %d       %dr / %db     "
-		 " %s %d      StartBeat: %d  LengthBeat: %d",
-		 t_current, beat_no, master_phase * 180.0f / M_PI, bpm,
-		 move_no_a, move_no_b, spline_active ? "Spline " : "Fade ",
+		 "C: [Seg %d/%d] t: %.2f b: %d  Ph: %.0f BPM: %d  %dr/%db  "
+		 "%s%d  Start: %d Len: %d",
+		 current_segment + 1, MAX_SEGMENTS, t_current, beat_no,
+		 master_phase * 180.0f / M_PI, bpm, move_no_a, move_no_b,
+		 spline_active ? "S" : "F",
 		 spline_active ? current_spline_type : current_fade_index,
 		 transition_start_beat, transition_beats);
 	SDL_SetWindowTitle(window, str);
@@ -610,35 +770,53 @@ static void init_spline_by_type(struct move_spline *sp, int type,
 	}
 }
 
+/* Spline-cache for multi-segment avspilling */
+static struct move_spline segment_splines[MAX_SEGMENTS];
+static int segment_spline_initialized[MAX_SEGMENTS] = { 0 };
+
 void send_mixed_pose_at_time(float t)
 {
 	pb.t = t;
+	struct playback_state state = get_state_at_time(t);
 
-	if (!spline_active) {
-		float cf = get_crossfader(t);
-		current_fade(&move_lib[move_no_a], &move_lib[move_no_b], cf,
-			     geom, &pb, &pose_mix);
-		goto send;
+	if (!state.in_transition) {
+		/* Ikke i transisjon - spill enkeltstående move */
+		move_evaluate(&move_lib[state.move_no], &pb, geom, &pose_mix);
+	} else {
+		/* I transisjon - bruk fade eller spline */
+		int idx = state.segment_idx;
+		int seg_move_a = segments[idx].move_a;
+		int seg_move_b = segments[idx].move_b;
+		int seg_trans_type = segments[idx].trans_type;
+		int seg_trans_nr = segments[idx].trans_nr;
+		float beat_duration = 60.0f / bpm;
+		float seg_start_t = segments[idx].trans_start * beat_duration;
+		float seg_end_t = seg_start_t +
+				  segments[idx].trans_len * beat_duration;
+
+		if (!seg_trans_type) {
+			/* Fade */
+			fade_func_t fade = fade_funcs[seg_trans_nr];
+			fade(&move_lib[seg_move_a], &move_lib[seg_move_b],
+			     state.crossfader, geom, &pb, &pose_mix);
+		} else {
+			/* Spline */
+			if (!segment_spline_initialized[idx]) {
+				float duration = seg_end_t - seg_start_t;
+				struct move_playback init_pb = pb;
+				init_pb.t = seg_start_t;
+				init_spline_by_type(&segment_splines[idx],
+						    seg_trans_nr,
+						    &move_lib[seg_move_a],
+						    &move_lib[seg_move_b],
+						    &init_pb, geom, duration);
+				segment_spline_initialized[idx] = 1;
+			}
+			move_spline_evaluate(&segment_splines[idx], &pb,
+					     &pose_mix);
+		}
 	}
 
-	if (!spline_initialized && t >= t_mix_start) {
-		float duration = t_mix_end - t_mix_start;
-		pb.t = t_mix_start;
-		init_spline_by_type(&spline, current_spline_type,
-				    &move_lib[move_no_a], &move_lib[move_no_b],
-				    &pb, geom, duration);
-		spline_initialized = 1;
-		pb.t = t;
-	}
-
-	if (t < t_mix_start)
-		move_evaluate(&move_lib[move_no_a], &pb, geom, &pose_mix);
-	else if (t > t_mix_end)
-		move_evaluate(&move_lib[move_no_b], &pb, geom, &pose_mix);
-	else
-		move_spline_evaluate(&spline, &pb, &pose_mix);
-
-send:
 	pose_mix.ty += geom->home_height;
 	viz_sender_send_pose(viz_sock, &pose_mix, ROBOT_TYPE_MX64, 9002);
 }
@@ -666,61 +844,86 @@ int map_y_to_screen(float y, int subplot_no)
 	return subplot_top + local_y;
 }
 
-void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
-		float t_start, float t_end)
-{
-	SDL_SetRenderDrawColor(renderer, graph->r, graph->g, graph->b, 255);
+/* Spline-cache for graf-tegning (separat fra avspilling) */
+static struct move_spline graph_segment_splines[MAX_SEGMENTS];
+static int graph_segment_spline_init[MAX_SEGMENTS] = { 0 };
 
+void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
+		float t_start_draw, float t_end_draw)
+{
 	int prev_x = -1;
 	int prev_y = -1;
-	struct move_spline graph_spline;
-	int graph_spline_initialized = 0;
+	int prev_in_transition = -1;
+	float beat_duration = 60.0f / bpm;
+
+	/* Reset spline init flags for this draw pass */
+	for (int i = 0; i < MAX_SEGMENTS; i++)
+		graph_segment_spline_init[i] = 0;
 
 	move_playback_reset(&pb);
-	pb.t = t_start;
+	pb.t = t_start_draw;
 
-	for (float t = t_start; t <= t_end; t += T_STEP) {
+	for (float t = t_start_draw; t <= t_end_draw; t += T_STEP) {
 		move_playback_tick(&pb, T_STEP);
-		move_evaluate(&move_lib[move_no_a], &pb, geom, &pose_graph_1);
-		move_evaluate(&move_lib[move_no_b], &pb, geom, &pose_graph_2);
 
-		if (!spline_active) {
-			float cf = get_crossfader(t);
-			current_fade(&move_lib[move_no_a], &move_lib[move_no_b],
-				     cf, geom, &pb, &pose_graph_mix);
-			goto draw;
+		struct playback_state state = get_state_at_time(t);
+
+		if (!state.in_transition) {
+			/* Ikke i transisjon - tegn move med rød farge */
+			move_evaluate(&move_lib[state.move_no], &pb, geom,
+				      &pose_graph_mix);
+			SDL_SetRenderDrawColor(renderer, 244, 100, 100, 255);
+		} else {
+			/* I transisjon - tegn mix med hvit farge */
+			int idx = state.segment_idx;
+			int seg_move_a = segments[idx].move_a;
+			int seg_move_b = segments[idx].move_b;
+			int seg_trans_type = segments[idx].trans_type;
+			int seg_trans_nr = segments[idx].trans_nr;
+			float seg_start_t = segments[idx].trans_start *
+					    beat_duration;
+			float seg_end_t = seg_start_t +
+					  segments[idx].trans_len *
+						  beat_duration;
+
+			if (!seg_trans_type) {
+				/* Fade */
+				fade_func_t fade = fade_funcs[seg_trans_nr];
+				fade(&move_lib[seg_move_a],
+				     &move_lib[seg_move_b], state.crossfader,
+				     geom, &pb, &pose_graph_mix);
+			} else {
+				/* Spline */
+				if (!graph_segment_spline_init[idx]) {
+					float duration = seg_end_t -
+							 seg_start_t;
+					struct move_playback init_pb = pb;
+					init_pb.t = seg_start_t;
+					init_spline_by_type(
+						&graph_segment_splines[idx],
+						seg_trans_nr,
+						&move_lib[seg_move_a],
+						&move_lib[seg_move_b], &init_pb,
+						geom, duration);
+					graph_segment_spline_init[idx] = 1;
+				}
+				move_spline_evaluate(
+					&graph_segment_splines[idx], &pb,
+					&pose_graph_mix);
+			}
+			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
 		}
 
-		if (!graph_spline_initialized && t >= t_mix_start) {
-			float duration = t_mix_end - t_mix_start;
-			struct move_playback init_pb = pb;
-			init_pb.t = t_mix_start;
-			init_spline_by_type(&graph_spline, current_spline_type,
-					    &move_lib[move_no_a],
-					    &move_lib[move_no_b], &init_pb,
-					    geom, duration);
-			graph_spline_initialized = 1;
-		}
-
-		if (t < t_mix_start)
-			move_evaluate(&move_lib[move_no_a], &pb, geom,
-				      &pose_graph_mix);
-		else if (t > t_mix_end)
-			move_evaluate(&move_lib[move_no_b], &pb, geom,
-				      &pose_graph_mix);
-		else
-			move_spline_evaluate(&graph_spline, &pb,
-					     &pose_graph_mix);
-
-	draw:
 		int x = map_t_to_x(t);
 		int y = map_y_to_screen(graph->func(t), graph_no % 6);
 
-		if (prev_x >= 0)
+		/* Bare tegn linje hvis vi er i samme tilstand som forrige punkt */
+		if (prev_x >= 0 && prev_in_transition == state.in_transition)
 			SDL_RenderDrawLine(renderer, prev_x, prev_y, x, y);
 
 		prev_x = x;
 		prev_y = y;
+		prev_in_transition = state.in_transition;
 	}
 }
 
@@ -735,6 +938,23 @@ static void init_move_system(void)
 		printf("Kunne ikke laste move_lib.json, bruker randomiserte moves\n");
 		move_lib_randomize_range(20, 80, 0.5f);
 	}
+
+	/* Initialiser og last segmenter */
+	init_segments();
+	load_choreo(choreo_filename);
+
+	/* Synkroniser globale variabler med current_segment */
+	move_no_a = segments[current_segment].move_a;
+	move_no_b = segments[current_segment].move_b;
+	spline_active = segments[current_segment].trans_type;
+	if (spline_active)
+		current_spline_type = segments[current_segment].trans_nr;
+	else
+		current_fade_index = segments[current_segment].trans_nr;
+	current_fade = fade_funcs[current_fade_index];
+	transition_start_beat = segments[current_segment].trans_start;
+	transition_beats = segments[current_segment].trans_len;
+
 	move_playback_set_bpm(&pb, bpm);
 	pb.master_phase = master_phase;	 // Synk beat-fase
 	T = 1.0f / f0;
@@ -936,7 +1156,16 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		update_title(window);
 		break;
 	case SDLK_w:
-		save_segment();
+		/* Lagre nåværende verdier til current segment før save */
+		segments[current_segment].move_a = move_no_a;
+		segments[current_segment].move_b = move_no_b;
+		segments[current_segment].trans_type = spline_active;
+		segments[current_segment].trans_nr =
+			spline_active ? current_spline_type :
+					current_fade_index;
+		segments[current_segment].trans_start = transition_start_beat;
+		segments[current_segment].trans_len = transition_beats;
+		save_choreo();
 		break;
 	}
 }
@@ -981,6 +1210,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 				move_no_a = 0;
 			if (move_no_a > 98)
 				move_no_a = 98;
+			segments[current_segment].move_a = move_no_a;
 			move_mixer.deck_a = move_no_a;
 			update_title(window);
 			send_move_bars(move_no_a);
@@ -991,6 +1221,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 				move_no_b = 0;
 			if (move_no_b > 98)
 				move_no_b = 98;
+			segments[current_segment].move_b = move_no_b;
 			move_mixer.deck_b = move_no_b;
 			update_title(window);
 			send_move_bars(move_no_b);
@@ -999,6 +1230,8 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			transition_start_beat += (int)ev->value;
 			if (transition_start_beat < 0)
 				transition_start_beat = 0;
+			segments[current_segment].trans_start =
+				transition_start_beat;
 			update_transition_times();
 			spline_initialized = 0;
 			update_title(window);
@@ -1007,6 +1240,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			transition_beats += (int)ev->value;
 			if (transition_beats < 1)
 				transition_beats = 1;
+			segments[current_segment].trans_len = transition_beats;
 			update_transition_times();
 			spline_initialized = 0;
 			update_title(window);
@@ -1041,6 +1275,10 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 						fade_funcs[current_fade_index];
 				}
 			}
+			segments[current_segment].trans_type = spline_active;
+			segments[current_segment].trans_nr =
+				spline_active ? current_spline_type :
+						current_fade_index;
 			update_title(window);
 			break;
 		}
@@ -1060,6 +1298,10 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			break;
 		case PLOTTER_ID_SPLINE_MODE:
 			spline_active = !spline_active;
+			segments[current_segment].trans_type = spline_active;
+			segments[current_segment].trans_nr =
+				spline_active ? current_spline_type :
+						current_fade_index;
 			spline_initialized = 0;
 			update_title(window);
 			break;
@@ -1082,7 +1324,18 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			update_title(window);
 			break;
 		case PLOTTER_ID_SAVE:
-			save_segment();
+			/* Lagre nåværende verdier til current segment før save
+			 */
+			segments[current_segment].move_a = move_no_a;
+			segments[current_segment].move_b = move_no_b;
+			segments[current_segment].trans_type = spline_active;
+			segments[current_segment].trans_nr =
+				spline_active ? current_spline_type :
+						current_fade_index;
+			segments[current_segment].trans_start =
+				transition_start_beat;
+			segments[current_segment].trans_len = transition_beats;
+			save_choreo();
 			break;
 		case PLOTTER_ID_TIME_LEFT_FAST:
 			t_current -= t_inc_manual * 12.0f;
@@ -1198,6 +1451,94 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			}
 			break;
 		}
+		case PLOTTER_ID_SEGMENT_DOWN:
+			if (current_segment > 0) {
+				/* Lagre nåværende verdier til segments[] */
+				segments[current_segment].move_a = move_no_a;
+				segments[current_segment].move_b = move_no_b;
+				segments[current_segment].trans_type =
+					spline_active;
+				segments[current_segment].trans_nr =
+					spline_active ? current_spline_type :
+							current_fade_index;
+				segments[current_segment].trans_start =
+					transition_start_beat;
+				segments[current_segment].trans_len =
+					transition_beats;
+
+				current_segment--;
+
+				/* Last inn verdier fra nytt segment */
+				move_no_a = segments[current_segment].move_a;
+				move_no_b = segments[current_segment].move_b;
+				spline_active =
+					segments[current_segment].trans_type;
+				if (spline_active)
+					current_spline_type =
+						segments[current_segment]
+							.trans_nr;
+				else {
+					current_fade_index =
+						segments[current_segment]
+							.trans_nr;
+					current_fade =
+						fade_funcs[current_fade_index];
+				}
+				transition_start_beat =
+					segments[current_segment].trans_start;
+				transition_beats =
+					segments[current_segment].trans_len;
+				update_transition_times();
+				spline_initialized = 0;
+				printf("Segment: %d/%d\n", current_segment + 1,
+				       MAX_SEGMENTS);
+			}
+			update_title(window);
+			break;
+		case PLOTTER_ID_SEGMENT_UP:
+			if (current_segment < MAX_SEGMENTS - 1) {
+				/* Lagre nåværende verdier til segments[] */
+				segments[current_segment].move_a = move_no_a;
+				segments[current_segment].move_b = move_no_b;
+				segments[current_segment].trans_type =
+					spline_active;
+				segments[current_segment].trans_nr =
+					spline_active ? current_spline_type :
+							current_fade_index;
+				segments[current_segment].trans_start =
+					transition_start_beat;
+				segments[current_segment].trans_len =
+					transition_beats;
+
+				current_segment++;
+
+				/* Last inn verdier fra nytt segment */
+				move_no_a = segments[current_segment].move_a;
+				move_no_b = segments[current_segment].move_b;
+				spline_active =
+					segments[current_segment].trans_type;
+				if (spline_active)
+					current_spline_type =
+						segments[current_segment]
+							.trans_nr;
+				else {
+					current_fade_index =
+						segments[current_segment]
+							.trans_nr;
+					current_fade =
+						fade_funcs[current_fade_index];
+				}
+				transition_start_beat =
+					segments[current_segment].trans_start;
+				transition_beats =
+					segments[current_segment].trans_len;
+				update_transition_times();
+				spline_initialized = 0;
+				printf("Segment: %d/%d\n", current_segment + 1,
+				       MAX_SEGMENTS);
+			}
+			update_title(window);
+			break;
 		}
 	} else if (ev->type == PLOTTER_FADER) {
 		/* Faders kun aktive når edit_dof er valgt */
@@ -1261,12 +1602,10 @@ static void render_frame(SDL_Renderer *renderer, struct Graph *graphs)
 	SDL_RenderClear(renderer);
 	draw_grid(renderer);
 
-	for (int i = 0; i < NO_OF_SUBPLOTS * 3; i++) {
-		if (i > 11)
-			draw_graph(renderer, &graphs[i], i, t_mix_start,
-				   t_mix_end);
-		else
-			draw_graph(renderer, &graphs[i], i, t_start, t_end);
+	/* Tegn kun mix-grafene (12-17) over hele vinduet.
+	 * draw_graph setter farge dynamisk: rød=move, hvit=transisjon */
+	for (int i = 12; i < 18; i++) {
+		draw_graph(renderer, &graphs[i], i, t_start, t_end);
 	}
 
 	SDL_RenderPresent(renderer);

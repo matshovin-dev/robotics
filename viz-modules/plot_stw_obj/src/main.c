@@ -82,8 +82,8 @@ static int load_models(enum stewart_robot_type robot_type)
 	viz_printf("Loading OBJ models for %s...\n", folder);
 
 	/* Load bunn (base) */
-	snprintf(path, sizeof(path),
-		 "../../assets/3d_models/obj/%s/bunn.obj", folder);
+	snprintf(path, sizeof(path), "../../assets/3d_models/obj/%s/bunn.obj",
+		 folder);
 	model_bunn = obj_load(path);
 	if (!model_bunn) {
 		fprintf(stderr, "Failed to load bunn.obj\n");
@@ -290,9 +290,7 @@ static void render_stewart_obj(void)
 	/* === RENDER PLATFORM (TOP) === */
 	glPushMatrix();
 	/* Apply pose transformation - pose is already absolute */
-	glTranslatef(current_pose.tx,
-		     current_pose.ty,
-		     current_pose.tz);
+	glTranslatef(current_pose.tx, current_pose.ty, current_pose.tz);
 	glRotatef(current_pose.rz, 0, 0, 1); /* Yaw (Z) */
 	glRotatef(current_pose.ry, 0, 1, 0); /* Pitch (Y) */
 	glRotatef(current_pose.rx, 1, 0, 0); /* Roll (X) */
@@ -301,7 +299,8 @@ static void render_stewart_obj(void)
 	glPopMatrix();
 
 	/* === RENDER MOTOR ARMS === */
-	/* Pattern: legL at base_points[0], legR at base_points[1], repeated 3x with 120deg rotation */
+	/* Pattern: legL at base_points[0], legR at base_points[1], repeated 3x
+	 * with 120deg rotation */
 
 	/* Motor 0 - legL */
 	glPushMatrix();
@@ -381,8 +380,8 @@ static void render_stewart_obj(void)
 
 		/* Calculate yaw and pitch angles */
 		float yaw = atan2f(direction.x, direction.z) * 180.0f / M_PI;
-		float pitch = asinf(direction.y / length) * 180.0f / M_PI -
-			      90.0f;
+		float pitch =
+			asinf(direction.y / length) * 180.0f / M_PI - 90.0f;
 
 		glPushMatrix();
 		glTranslatef(knee->x, knee->y, knee->z);
@@ -452,7 +451,8 @@ static void poll_udp(void)
 		if (packet.magic == VIZ_MAGIC &&
 		    packet.type == VIZ_PACKET_POSE) {
 			/* Check if robot type changed before updating pose */
-			int robot_changed = (packet.robot_type != current_pose.robot_type);
+			int robot_changed =
+				(packet.robot_type != current_pose.robot_type);
 
 			current_pose = packet;
 
@@ -521,9 +521,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	/* Create window */
-	window = glfwCreateWindow(1024, 768, "Stewart Platform OBJ Viewer",
-				  NULL, NULL);
+	/* Create window - disable resizing to work around macOS 15 cursor bug
+	 */
+	glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+	window = glfwCreateWindow(1024 / 2, 768 / 2,
+				  "Stewart Platform OBJ Viewer", NULL, NULL);
 	if (!window) {
 		fprintf(stderr, "Failed to create window\n");
 		glfwTerminate();

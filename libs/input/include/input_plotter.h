@@ -41,6 +41,8 @@
 #define PLOTTER_ID_RUN_4_BEATS     22  /* Run 4 beats from next beat (button) */
 #define PLOTTER_ID_CYCLE_DOF       23  /* Cycle through DOFs for fader edit (button) */
 #define PLOTTER_ID_PHASE_SHIFT_B   24  /* Shift deck B phases to move waveform (button) */
+#define PLOTTER_ID_SEGMENT_DOWN    25  /* Decrease current segment (button) */
+#define PLOTTER_ID_SEGMENT_UP      26  /* Increase current segment (button) */
 
 /* Fader IDs for parameter editing (CC 90-96) */
 #define PLOTTER_ID_FADER_0         30  /* amp1 */
