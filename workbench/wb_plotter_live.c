@@ -869,12 +869,16 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 		struct playback_state state = get_state_at_time(t);
 
 		if (!state.in_transition) {
-			/* Ikke i transisjon - tegn move med rød farge */
+			/* Ikke i transisjon - tegn move med alternerende farge */
 			move_evaluate(&move_lib[state.move_no], &pb, geom,
 				      &pose_graph_mix);
-			SDL_SetRenderDrawColor(renderer, 244, 100, 100, 255);
+			/* Alternerende farge basert på segment_idx (rød/blå) */
+			if (state.segment_idx % 2 == 0)
+				SDL_SetRenderDrawColor(renderer, 244, 100, 100, 255); /* Rød */
+			else
+				SDL_SetRenderDrawColor(renderer, 100, 100, 244, 255); /* Blå */
 		} else {
-			/* I transisjon - tegn mix med hvit farge */
+			/* I transisjon */
 			int idx = state.segment_idx;
 			int seg_move_a = segments[idx].move_a;
 			int seg_move_b = segments[idx].move_b;
@@ -911,7 +915,11 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 					&graph_segment_splines[idx], &pb,
 					&pose_graph_mix);
 			}
-			SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
+			/* Current segment = rød, andre = hvit */
+			if (idx == current_segment)
+				SDL_SetRenderDrawColor(renderer, 244, 100, 100, 255); /* Rød */
+			else
+				SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); /* Hvit */
 		}
 
 		int x = map_t_to_x(t);

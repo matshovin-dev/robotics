@@ -64,13 +64,13 @@
 /* MIDI NOTE mappings - button row 3 */
 #define MIDI_NOTE_MUSIC_TOGGLE    24
 #define MIDI_NOTE_CLEAR_DECK_B    28
-#define MIDI_NOTE_SEGMENT_DOWN    30  /* Decrease current segment */
+#define MIDI_NOTE_SEGMENT_DOWN    38  /* Decrease current segment */
 #define MIDI_NOTE_PHASE_SHIFT_B   31
 
 /* MIDI NOTE mappings - button row 4 */
 #define MIDI_NOTE_RUN_4_BEATS     32
 #define MIDI_NOTE_RANDOM_DECK_B   36
-#define MIDI_NOTE_SEGMENT_UP      38  /* Increase current segment */
+#define MIDI_NOTE_SEGMENT_UP      30  /* Increase current segment */
 
 /* Event queue */
 #define EVENT_QUEUE_SIZE 32
