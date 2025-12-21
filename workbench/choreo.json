@@ -3,20 +3,12 @@
 	"master_phase": 313.99999674706953,
 	"segments": [
 		{
-			"move_a": 4,
+			"move_a": 0,
 			"move_b": 21,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 4,
-			"trans_len": 4
-		},
-		{
-			"move_a": 4,
-			"move_b": 21,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 4,
-			"trans_len": 4
+			"trans_type": "S",
+			"trans_nr": 1,
+			"trans_start": 5,
+			"trans_len": 3
 		}
 	]
 }

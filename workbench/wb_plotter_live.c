@@ -103,8 +103,9 @@ static void update_transition_times(void)
 {
 	float beat_duration = 60.0f / bpm;
 	float phase_offset = (master_phase / (2.0f * M_PI)) * beat_duration;
-	float beep_offset = (3.0f / 4.0f) * beat_duration;  /* 270° = 3/4 beat */
-	t_mix_start = transition_start_beat * beat_duration - phase_offset + beep_offset;
+	float beep_offset = (3.0f / 4.0f) * beat_duration; /* 270° = 3/4 beat */
+	t_mix_start = transition_start_beat * beat_duration - phase_offset +
+		      beep_offset;
 	t_mix_end = t_mix_start + transition_beats * beat_duration;
 }
 
@@ -286,7 +287,7 @@ static void update_title(SDL_Window *window)
 	int beat_no = (int)((t_current / beat_duration) + phase_beats - 0.75f);
 
 	snprintf(str, sizeof(str),
-		 "C: t: %.2f b: %d    Phase: %.0f BPM: %d       %d / %d     "
+		 "C: t: %.2f b: %d    Phase: %.0f BPM: %d       %dr / %db     "
 		 " %s %d      StartBeat: %d  LengthBeat: %d",
 		 t_current, beat_no, master_phase * 180.0f / M_PI, bpm,
 		 move_no_a, move_no_b, spline_active ? "Spline " : "Fade ",
@@ -1132,9 +1133,12 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			 * Forholdet 4:2:1 gir samme tidsforskyvning. */
 			struct move *m = &move_lib[move_no_b];
 			for (int d = 0; d < MOVE_NUM_DOFS; d++) {
-				m->dof[d].h[0].phase = fmodf(m->dof[d].h[0].phase + 0.5f, 1.0f);
-				m->dof[d].h[1].phase = fmodf(m->dof[d].h[1].phase + 0.25f, 1.0f);
-				m->dof[d].h[2].phase = fmodf(m->dof[d].h[2].phase + 0.125f, 1.0f);
+				m->dof[d].h[0].phase = fmodf(
+					m->dof[d].h[0].phase + 0.5f, 1.0f);
+				m->dof[d].h[1].phase = fmodf(
+					m->dof[d].h[1].phase + 0.25f, 1.0f);
+				m->dof[d].h[2].phase = fmodf(
+					m->dof[d].h[2].phase + 0.125f, 1.0f);
 			}
 			printf("Phase shifted move %d (deck B)\n", move_no_b);
 			send_move_bars(move_no_b);
