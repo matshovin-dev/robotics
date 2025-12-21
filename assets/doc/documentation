@@ -66,3 +66,27 @@ Vol A | Vol B | Fade |
 
   Og synkronisering blir da å justere master_phase slik at move_downbeat treffer music_downbeat.
 
+
+--------------------------------------------
+Coreo procedyre
+
+
+
+1) Move_lib.json
+	Vil inneholde mange moves som ikke brukes her, disse må ikke røres
+	Sjekke før bruk	
+	Type jobb:
+		Lage nye moves som fylles på 
+			SAV M, lagrer hele move_lib
+		Merke av eksisterende moves
+	Alle moves må bli statiske etter design
+	Lagring etter design
+	Backup etter design?
+
+2) Corep_lib.json
+	Sjekke før bruk
+	Editere
+	Lagre
+	Backup?
+
+	

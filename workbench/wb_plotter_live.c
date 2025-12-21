@@ -47,8 +47,8 @@ void draw_grid(SDL_Renderer *renderer);
  * master_phase move_a_nr move_b_nr fad_start fad_end fad_type
  *
  * Start:
- * ./wb_plotter_live 0
- * 16/Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav
+ ./wb_plotter_live 0
+ 16/Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav
  */
 
 // Tidsintervall (kan overstyres med kommandolinje)
@@ -300,10 +300,10 @@ static int find_segment_at_beat(int beat)
 
 /* Tilstand ved en gitt tid */
 struct playback_state {
-	int in_transition;      /* 1 hvis i transisjon, 0 ellers */
-	int segment_idx;        /* Aktivt segment (-1 hvis ingen) */
-	int move_no;            /* Move som skal spilles (hvis ikke i transisjon) */
-	float crossfader;       /* 0.0-1.0 (kun gyldig hvis in_transition) */
+	int in_transition; /* 1 hvis i transisjon, 0 ellers */
+	int segment_idx; /* Aktivt segment (-1 hvis ingen) */
+	int move_no; /* Move som skal spilles (hvis ikke i transisjon) */
+	float crossfader; /* 0.0-1.0 (kun gyldig hvis in_transition) */
 };
 
 /* Finn avspillingstilstand ved gitt tid.
@@ -335,8 +335,8 @@ static struct playback_state get_state_at_time(float t)
 	for (int i = 0; i < MAX_SEGMENTS; i++) {
 		int idx = sorted[i];
 		float seg_start_t = segments[idx].trans_start * beat_duration;
-		float seg_end_t = seg_start_t +
-				  segments[idx].trans_len * beat_duration;
+		float seg_end_t =
+			seg_start_t + segments[idx].trans_len * beat_duration;
 
 		/* Skip segmenter som er langt utenfor (ubrukte) */
 		if (segments[idx].trans_start >= DEFAULT_SEGMENT_BEAT)
@@ -346,14 +346,15 @@ static struct playback_state get_state_at_time(float t)
 			/* Vi er i denne transisjonen */
 			state.in_transition = 1;
 			state.segment_idx = idx;
-			state.crossfader = (t - seg_start_t) /
-					   (seg_end_t - seg_start_t);
+			state.crossfader =
+				(t - seg_start_t) / (seg_end_t - seg_start_t);
 			return state;
 		} else if (t >= seg_end_t) {
 			/* Denne transisjonen er fullført */
 			last_completed_seg = idx;
 		} else if (t < seg_start_t && last_completed_seg == -1) {
-			/* Før første transisjon - bruk denne transisjonens move_a */
+			/* Før første transisjon - bruk denne transisjonens
+			 * move_a */
 			state.move_no = segments[idx].move_a;
 			return state;
 		}
@@ -791,8 +792,8 @@ void send_mixed_pose_at_time(float t)
 		int seg_trans_nr = segments[idx].trans_nr;
 		float beat_duration = 60.0f / bpm;
 		float seg_start_t = segments[idx].trans_start * beat_duration;
-		float seg_end_t = seg_start_t +
-				  segments[idx].trans_len * beat_duration;
+		float seg_end_t =
+			seg_start_t + segments[idx].trans_len * beat_duration;
 
 		if (!seg_trans_type) {
 			/* Fade */
@@ -869,14 +870,17 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 		struct playback_state state = get_state_at_time(t);
 
 		if (!state.in_transition) {
-			/* Ikke i transisjon - tegn move med alternerende farge */
+			/* Ikke i transisjon - tegn move med alternerende farge
+			 */
 			move_evaluate(&move_lib[state.move_no], &pb, geom,
 				      &pose_graph_mix);
 			/* Alternerende farge basert på segment_idx (rød/blå) */
 			if (state.segment_idx % 2 == 0)
-				SDL_SetRenderDrawColor(renderer, 244, 100, 100, 255); /* Rød */
+				SDL_SetRenderDrawColor(renderer, 244, 100, 100,
+						       255); /* Rød */
 			else
-				SDL_SetRenderDrawColor(renderer, 100, 100, 244, 255); /* Blå */
+				SDL_SetRenderDrawColor(renderer, 100, 100, 244,
+						       255); /* Blå */
 		} else {
 			/* I transisjon */
 			int idx = state.segment_idx;
@@ -884,11 +888,11 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 			int seg_move_b = segments[idx].move_b;
 			int seg_trans_type = segments[idx].trans_type;
 			int seg_trans_nr = segments[idx].trans_nr;
-			float seg_start_t = segments[idx].trans_start *
-					    beat_duration;
-			float seg_end_t = seg_start_t +
-					  segments[idx].trans_len *
-						  beat_duration;
+			float seg_start_t =
+				segments[idx].trans_start * beat_duration;
+			float seg_end_t =
+				seg_start_t +
+				segments[idx].trans_len * beat_duration;
 
 			if (!seg_trans_type) {
 				/* Fade */
@@ -899,8 +903,8 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 			} else {
 				/* Spline */
 				if (!graph_segment_spline_init[idx]) {
-					float duration = seg_end_t -
-							 seg_start_t;
+					float duration =
+						seg_end_t - seg_start_t;
 					struct move_playback init_pb = pb;
 					init_pb.t = seg_start_t;
 					init_spline_by_type(
@@ -917,15 +921,18 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 			}
 			/* Current segment = rød, andre = hvit */
 			if (idx == current_segment)
-				SDL_SetRenderDrawColor(renderer, 244, 100, 100, 255); /* Rød */
+				SDL_SetRenderDrawColor(renderer, 244, 100, 100,
+						       255); /* Rød */
 			else
-				SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255); /* Hvit */
+				SDL_SetRenderDrawColor(renderer, 255, 255, 255,
+						       255); /* Hvit */
 		}
 
 		int x = map_t_to_x(t);
 		int y = map_y_to_screen(graph->func(t), graph_no % 6);
 
-		/* Bare tegn linje hvis vi er i samme tilstand som forrige punkt */
+		/* Bare tegn linje hvis vi er i samme tilstand som forrige punkt
+		 */
 		if (prev_x >= 0 && prev_in_transition == state.in_transition)
 			SDL_RenderDrawLine(renderer, prev_x, prev_y, x, y);
 
@@ -1003,6 +1010,9 @@ static int init_sdl(SDL_Window **window, SDL_Renderer **renderer,
 		printf("SDL init feilet: %s\n", SDL_GetError());
 		return -1;
 	}
+
+	/* Tillat skjermsparer/display sleep */
+	SDL_EnableScreenSaver();
 
 	SDL_AudioSpec want, have;
 	SDL_memset(&want, 0, sizeof(want));
