@@ -1,166 +1,145 @@
 {
-	"bpm": 150,
-	"master_phase": 313.99999674706953,
-	"segments": [
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		},
-		{
-			"move_a": 0,
-			"move_b": 1,
-			"trans_type": "F",
-			"trans_nr": 0,
-			"trans_start": 180,
-			"trans_len": 4
-		}
-	]
+	"bpm":	150,
+	"master_phase":	313.99999674706953,
+	"segments":	[{
+			"move_a":	1,
+			"move_b":	9,
+			"trans_type":	"S",
+			"trans_nr":	1,
+			"trans_start":	5,
+			"trans_len":	4
+		}, {
+			"move_a":	9,
+			"move_b":	10,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	25,
+			"trans_len":	1
+		}, {
+			"move_a":	10,
+			"move_b":	8,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	33,
+			"trans_len":	2
+		}, {
+			"move_a":	8,
+			"move_b":	12,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	37,
+			"trans_len":	2
+		}, {
+			"move_a":	9,
+			"move_b":	13,
+			"trans_type":	"S",
+			"trans_nr":	1,
+			"trans_start":	44,
+			"trans_len":	2
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}, {
+			"move_a":	0,
+			"move_b":	1,
+			"trans_type":	"F",
+			"trans_nr":	0,
+			"trans_start":	180,
+			"trans_len":	4
+		}]
 }

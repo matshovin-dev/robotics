@@ -315,6 +315,8 @@ static struct playback_state get_state_at_time(float t)
 {
 	struct playback_state state = { 0, -1, 0, 0.0f };
 	float beat_duration = 60.0f / bpm;
+	float phase_offset = (master_phase / (2.0f * M_PI)) * beat_duration;
+	float beep_offset = (3.0f / 4.0f) * beat_duration;
 
 	/* Finn alle segmenter sortert etter trans_start */
 	int sorted[MAX_SEGMENTS];
@@ -337,7 +339,8 @@ static struct playback_state get_state_at_time(float t)
 	int last_completed_seg = -1;
 	for (int i = 0; i < MAX_SEGMENTS; i++) {
 		int idx = sorted[i];
-		float seg_start_t = segments[idx].trans_start * beat_duration;
+		float seg_start_t = segments[idx].trans_start * beat_duration
+				    - phase_offset + beep_offset;
 		float seg_end_t =
 			seg_start_t + segments[idx].trans_len * beat_duration;
 
@@ -807,6 +810,13 @@ static void init_spline_by_type(struct move_spline *sp, int type,
 static struct move_spline segment_splines[MAX_SEGMENTS];
 static int segment_spline_initialized[MAX_SEGMENTS] = { 0 };
 
+/* Reset alle segment spline caches */
+static void reset_segment_splines(void)
+{
+	for (int i = 0; i < MAX_SEGMENTS; i++)
+		segment_spline_initialized[i] = 0;
+}
+
 void send_mixed_pose_at_time(float t)
 {
 	pb.t = t;
@@ -823,7 +833,10 @@ void send_mixed_pose_at_time(float t)
 		int seg_trans_type = segments[idx].trans_type;
 		int seg_trans_nr = segments[idx].trans_nr;
 		float beat_duration = 60.0f / bpm;
-		float seg_start_t = segments[idx].trans_start * beat_duration;
+		float phase_offset = (master_phase / (2.0f * M_PI)) * beat_duration;
+		float beep_offset = (3.0f / 4.0f) * beat_duration;
+		float seg_start_t = segments[idx].trans_start * beat_duration
+				    - phase_offset + beep_offset;
 		float seg_end_t =
 			seg_start_t + segments[idx].trans_len * beat_duration;
 
@@ -888,6 +901,8 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 	int prev_y = -1;
 	int prev_in_transition = -1;
 	float beat_duration = 60.0f / bpm;
+	float phase_offset = (master_phase / (2.0f * M_PI)) * beat_duration;
+	float beep_offset = (3.0f / 4.0f) * beat_duration;
 
 	/* Reset spline init flags for this draw pass */
 	for (int i = 0; i < MAX_SEGMENTS; i++)
@@ -921,7 +936,8 @@ void draw_graph(SDL_Renderer *renderer, struct Graph *graph, int graph_no,
 			int seg_trans_type = segments[idx].trans_type;
 			int seg_trans_nr = segments[idx].trans_nr;
 			float seg_start_t =
-				segments[idx].trans_start * beat_duration;
+				segments[idx].trans_start * beat_duration
+				- phase_offset + beep_offset;
 			float seg_end_t =
 				seg_start_t +
 				segments[idx].trans_len * beat_duration;
@@ -1114,6 +1130,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 		audio_time = t_start;
 		music_sync_request = 1;
 		spline_initialized = 0;
+		reset_segment_splines();
 		move_playback_reset(&pb);
 		pb.master_phase = master_phase;
 		last_move_phase =
@@ -1171,6 +1188,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 			current_spline_type =
 				(current_spline_type + 1) % NUM_SPLINES;
 		spline_initialized = 0;
+		reset_segment_splines();
 		update_title(window);
 		break;
 	case SDLK_p:
@@ -1196,6 +1214,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 			transition_beats -= (transition_beats > 1) ? 1 : 0;
 		update_transition_times();
 		spline_initialized = 0;
+		reset_segment_splines();
 		update_title(window);
 		break;
 	case SDLK_i:
@@ -1207,6 +1226,7 @@ static void handle_key_event(SDL_Keysym key, SDL_Window *window, bool *running)
 				(transition_start_beat > 0) ? 1 : 0;
 		update_transition_times();
 		spline_initialized = 0;
+		reset_segment_splines();
 		update_title(window);
 		break;
 	case SDLK_w:
@@ -1290,6 +1310,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 				transition_start_beat;
 			update_transition_times();
 			spline_initialized = 0;
+		reset_segment_splines();
 			update_title(window);
 			break;
 		case PLOTTER_ID_TRANS_LEN:
@@ -1299,6 +1320,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			segments[current_segment].trans_len = transition_beats;
 			update_transition_times();
 			spline_initialized = 0;
+		reset_segment_splines();
 			update_title(window);
 			break;
 		case PLOTTER_ID_TRANS_TYPE:
@@ -1308,6 +1330,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 						(current_spline_type + 1) %
 						NUM_SPLINES;
 					spline_initialized = 0;
+		reset_segment_splines();
 				} else {
 					current_fade_index =
 						(current_fade_index + 1) %
@@ -1322,6 +1345,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 						 NUM_SPLINES) %
 						NUM_SPLINES;
 					spline_initialized = 0;
+		reset_segment_splines();
 				} else {
 					current_fade_index =
 						(current_fade_index - 1 +
@@ -1348,6 +1372,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			audio_time = t_start;
 			music_sync_request = 1;
 			spline_initialized = 0;
+		reset_segment_splines();
 			move_playback_reset(&pb);
 			pb.master_phase = master_phase;
 			last_move_phase = move_phase_1(&pb);
@@ -1359,6 +1384,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 				spline_active ? current_spline_type :
 						current_fade_index;
 			spline_initialized = 0;
+		reset_segment_splines();
 			update_title(window);
 			break;
 		case PLOTTER_ID_TIME_LEFT:
@@ -1472,6 +1498,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			audio_time = run_loop_start;
 			music_sync_request = 1;
 			spline_initialized = 0;
+		reset_segment_splines();
 			move_playback_reset(&pb);
 			pb.master_phase = master_phase;
 			last_move_phase = move_phase_1(&pb);
@@ -1549,6 +1576,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 					segments[current_segment].trans_len;
 				update_transition_times();
 				spline_initialized = 0;
+		reset_segment_splines();
 				printf("Segment: %d/%d\n", current_segment + 1,
 				       MAX_SEGMENTS);
 			}
@@ -1593,6 +1621,7 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 					segments[current_segment].trans_len;
 				update_transition_times();
 				spline_initialized = 0;
+		reset_segment_splines();
 				printf("Segment: %d/%d\n", current_segment + 1,
 				       MAX_SEGMENTS);
 			}
@@ -1730,6 +1759,7 @@ static void update_playback(float delta_time, SDL_Window *window)
 			audio_time = run_loop_start;
 			music_sync_request = 1;
 			spline_initialized = 0;
+		reset_segment_splines();
 			move_playback_reset(&pb);
 			pb.master_phase = master_phase;
 			last_move_phase = move_phase_1(&pb);
