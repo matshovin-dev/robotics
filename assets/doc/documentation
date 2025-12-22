@@ -70,7 +70,7 @@ Vol A | Vol B | Fade |
 --------------------------------------------
 Coreo procedyre
 
-
+./wb_plotter_live 0 16 /Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav choreo.json /Users/matsmac/vsCode/robotics/assets/moves/move_lib.json
 
 1) Move_lib.json
 	Vil inneholde mange moves som ikke brukes her, disse må ikke røres

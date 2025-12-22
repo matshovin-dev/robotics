@@ -2,9 +2,9 @@
  * wb_plotter_live.c - Enkel y(t) graf-plotter med live vindu
  *
  * Bygg: make wb_plotter_live
- * Kjør:  ./wb_plotter_live [start_beat] [end_beat] [music.wav] [choreo.json]
+ * Kjør:  ./wb_plotter_live [start_beat] [end_beat] [music.wav] [choreo.json] [move_lib.json]
  *
- * Eksempel: ./wb_plotter_live 0 32 track.wav mysong.json
+ * Eksempel: ./wb_plotter_live 0 32 track.wav mysong.json moves.json
  *
  * Trykk ESC eller lukk vinduet for å avslutte.
  * Trykk W eller NOTE 12 for å lagre segment til koreografi-fil.
@@ -47,8 +47,8 @@ void draw_grid(SDL_Renderer *renderer);
  * master_phase move_a_nr move_b_nr fad_start fad_end fad_type
  *
  * Start:
- ./wb_plotter_live 0
- 16/Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav
+ "./wb_plotter_live 0
+ 16/Users/matsmac/vsCode/robotics/assets/songs/MariahCrist.wav"
  */
 
 // Tidsintervall (kan overstyres med kommandolinje)
@@ -137,6 +137,9 @@ const char *spline_names[] = {
 
 /* Koreografi-fil */
 const char *choreo_filename = "choreo.json";
+
+/* Move library fil */
+const char *move_lib_filename = "../assets/moves/move_lib.json";
 
 /* Segment-struktur for koreografi */
 #define MAX_SEGMENTS 20
@@ -445,7 +448,7 @@ static void send_move_lib(void)
 	if (viz_sock < 0)
 		return;
 
-	float values[4200];  /* 100 moves x 42 params */
+	float values[4200]; /* 100 moves x 42 params */
 
 	for (int m = 0; m < 100; m++) {
 		const struct move *mov = &move_lib[m];
@@ -459,7 +462,8 @@ static void send_move_lib(void)
 			values[dof_base + 3] = mov->dof[dof].h[1].phase;
 			values[dof_base + 4] = mov->dof[dof].h[2].amplitude;
 			values[dof_base + 5] = mov->dof[dof].h[2].phase;
-			values[dof_base + 6] = (mov->dof[dof].bias + 1.0f) * 0.5f;
+			values[dof_base + 6] =
+				(mov->dof[dof].bias + 1.0f) * 0.5f;
 		}
 	}
 
@@ -975,10 +979,12 @@ static void init_move_system(void)
 	move_lib_init();
 
 	/* Last moves fra fil, ellers bruk randomiserte */
-	if (move_lib_load("../assets/moves/move_lib.json") == 0) {
-		printf("Lastet moves fra ../assets/moves/move_lib.json\n");
+	int moves_loaded = move_lib_load(move_lib_filename);
+	if (moves_loaded > 0) {
+		printf("Lastet %d moves fra %s\n", moves_loaded, move_lib_filename);
 	} else {
-		printf("Kunne ikke laste move_lib.json, bruker randomiserte moves\n");
+		printf("Kunne ikke laste %s, bruker randomiserte moves\n",
+		       move_lib_filename);
 		move_lib_randomize_range(20, 80, 0.5f);
 	}
 
@@ -1414,8 +1420,8 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			printf("Music: %s\n", music_playing ? "ON" : "OFF");
 			break;
 		case PLOTTER_ID_SAVE_MOVE_LIB:
-			if (move_lib_save("../assets/moves/move_lib.json") == 0)
-				printf("Saved move_lib to ../assets/moves/move_lib.json\n");
+			if (move_lib_save(move_lib_filename) == 0)
+				printf("Saved move_lib to %s\n", move_lib_filename);
 			else
 				printf("Failed to save move_lib\n");
 			break;
@@ -1695,13 +1701,16 @@ static void update_playback(float delta_time, SDL_Window *window)
 int main(int argc, char *argv[])
 {
 	/* Kommandolinje-argumenter: start_beat end_beat [music.wav]
-	 * [choreo.json] */
+	 * [choreo.json] [move_lib.json] */
 	if (argc >= 3) {
 		start_beat = atoi(argv[1]);
 		end_beat = atoi(argv[2]);
 	}
 	if (argc >= 5) {
 		choreo_filename = argv[4];
+	}
+	if (argc >= 6) {
+		move_lib_filename = argv[5];
 	}
 
 	init_move_system();
