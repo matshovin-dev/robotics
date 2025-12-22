@@ -1,3 +1,11 @@
+================= GIT =========================================
+git add -A
+git status
+git commit -m "ja"
+git push
+
+================= TRE =========================================
+
 tree ~/vscode/robotics -C -I 'html|latex|*.o|*.d|.git'
 
 doxygen Doxyfile 

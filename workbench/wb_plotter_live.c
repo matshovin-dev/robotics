@@ -1600,7 +1600,48 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			break;
 		}
 	} else if (ev->type == PLOTTER_FADER) {
-		/* Faders kun aktive når edit_dof er valgt */
+		/* DOF select fader (CC 97) - always active */
+		if (ev->id == PLOTTER_ID_DOF_SELECT) {
+			const char *dof_names[] = { "RX", "RY", "RZ",
+						    "TX", "TY", "TZ" };
+			int new_dof;
+
+			/* Map fader 0-1 to DOF: 0-0.125=OFF, then 6 zones */
+			if (ev->value < 0.125f) {
+				new_dof = -1;  /* OFF */
+			} else {
+				/* 0.125-1.0 maps to 0-5 */
+				new_dof = (int)((ev->value - 0.125f) / 0.875f * 6.0f);
+				if (new_dof > 5) new_dof = 5;
+			}
+
+			if (new_dof != edit_dof) {
+				edit_dof = new_dof;
+				if (edit_dof == -1) {
+					printf("Edit DOF: OFF\n");
+					float zeros[7] = { 0 };
+					input_plotter_set_all_faders(zeros);
+				} else {
+					printf("Edit DOF: %s (%d)\n",
+					       dof_names[edit_dof], edit_dof);
+					struct move *m = &move_lib[move_no_b];
+					float values[7] = {
+						m->dof[edit_dof].h[0].amplitude,
+						m->dof[edit_dof].h[0].phase,
+						m->dof[edit_dof].h[1].amplitude,
+						m->dof[edit_dof].h[1].phase,
+						m->dof[edit_dof].h[2].amplitude,
+						m->dof[edit_dof].h[2].phase,
+						(m->dof[edit_dof].bias + 1.0f) * 0.5f
+					};
+					input_plotter_set_all_faders(values);
+				}
+				send_move_lib();
+			}
+			return;
+		}
+
+		/* Parameter faders - kun aktive når edit_dof er valgt */
 		if (edit_dof < 0 || edit_dof > 5)
 			return;
 

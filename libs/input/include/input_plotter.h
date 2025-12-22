@@ -1,10 +1,10 @@
 /**
  * @file input_plotter.h
- * @brief MIDI input for wb_plotter_live (Behringer X-Touch Mini)
+ * @brief MIDI input for wb_plotter_live (Behringer X-Touch Extender)
  *
- * Behringer X-Touch Mini layout:
+ * Behringer X-Touch Extender layout:
  *   CC 80-87: Top row encoders
- *   CC 90-97: Bottom row encoders/faders
+ *   CC 70-77: Bottom row faders
  *   NOTE 8-15, 16-23, 24-31, 32-39: Button rows
  */
 
@@ -44,14 +44,15 @@
 #define PLOTTER_ID_SEGMENT_DOWN    25  /* Decrease current segment (button) */
 #define PLOTTER_ID_SEGMENT_UP      26  /* Increase current segment (button) */
 
-/* Fader IDs for parameter editing (CC 90-96) */
-#define PLOTTER_ID_FADER_0         30  /* amp1 */
-#define PLOTTER_ID_FADER_1         31  /* phase1 */
-#define PLOTTER_ID_FADER_2         32  /* amp2 */
-#define PLOTTER_ID_FADER_3         33  /* phase2 */
-#define PLOTTER_ID_FADER_4         34  /* amp3 */
-#define PLOTTER_ID_FADER_5         35  /* phase3 */
-#define PLOTTER_ID_FADER_6         36  /* bias */
+/* Fader IDs for parameter editing (CC 70-77) */
+#define PLOTTER_ID_FADER_0         30  /* amp1 (CC 70) */
+#define PLOTTER_ID_FADER_1         31  /* phase1 (CC 71) */
+#define PLOTTER_ID_FADER_2         32  /* amp2 (CC 72) */
+#define PLOTTER_ID_FADER_3         33  /* phase2 (CC 73) */
+#define PLOTTER_ID_FADER_4         34  /* amp3 (CC 74) */
+#define PLOTTER_ID_FADER_5         35  /* phase3 (CC 75) */
+#define PLOTTER_ID_FADER_6         36  /* bias (CC 76) */
+#define PLOTTER_ID_DOF_SELECT      37  /* DOF selector fader (CC 77) */
 
 /**
  * struct plotter_event - Input event for plotter

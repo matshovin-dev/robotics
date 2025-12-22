@@ -1,0 +1,67 @@
+
+80	81	82	83	84	85	86	87	CC
+-------	-------	-------	-------	-------	-------	-------	-------
+Mfase
+
+
+
+
+8	9	10	11	12	13	14	15	NOTE
+-------	-------	-------	-------	-------	-------	-------	-------	
+
+
+16	17	18	19	20	21	22	23	NOTE
+-------	-------	-------	-------	-------	-------	-------	-------	
+
+
+24	25	26	27	28	29	30	31	NOTE
+-------	-------	-------	-------	-------	-------	-------	-------	
+
+
+32	33	34	35	36	37	38	39	NOTE
+-------	-------	-------	-------	-------	-------	-------	-------	
+
+
+
+
+
+70	71	72	73	74	75	76	77	CC
+------- ------- ------- ------- ------- ------- ------- -------
+
+
+
+  Mapping (Behringer X-Touch Mini):
+  Encodere (CC):
+    80: master_phase, 0.2 rad increments
+    81: master_phase, 0.05 rad increments
+    82: bpm
+    83: move_a_nr  
+    84: move_b_nr
+    85: transition_start_beat
+    86: transition_beats
+    87: transition type - spline or regular fade
+
+  Knapper (NOTE):
+    8: Run animation
+    9: Toggle spline/fade mode
+    10: Step time left
+    11: Step time right    
+
+    C: bpm, master_phase, move_a_nr, move_b_nr, transition_type, transition_nr, transition_start_beat, transition_beats  
+
+  Behringer X-Touch Mini mapping:
+  Encodere (CC):
+    80: master_phase (0.2 rad)
+    81: master_phase (0.05 rad fin-justering)
+    82: bpm
+    83: move_a_nr (deaktivert, const)
+    84: move_b_nr
+    85: transition_start_beat
+    86: transition_beats
+    87: transition type (fade/spline avhengig av modus)
+
+  Knapper (NOTE):
+     8: Run animation
+     9: Toggle spline/fade mode
+    10: Step time left
+    11: Step time right

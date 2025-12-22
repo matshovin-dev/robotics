@@ -59,6 +59,7 @@ static int udp_sock = -1;
 static int highlight_deck_a = -1;
 static int highlight_deck_b = -1;
 static int highlight_edit_dof = -1;
+static GLFWwindow *main_window = NULL;
 
 /* Colors for parameters */
 static const float param_colors[7][3] = {
@@ -172,6 +173,51 @@ static int load_move_lib(const char *filename)
 }
 
 /**
+ * update_title - Update window title with deck_b DOF values
+ */
+static void update_title(void)
+{
+	if (!main_window || highlight_deck_b < 0 || highlight_deck_b >= NUM_MOVES)
+		return;
+
+	struct move_params *m = &moves[highlight_deck_b];
+	const char *dof_names[] = { "rx", "ry", "rz", "tx", "ty", "tz" };
+
+	char title[256];
+
+	if (highlight_edit_dof >= 0 && highlight_edit_dof < 6) {
+		/* Show all 7 params for selected DOF */
+		int base = highlight_edit_dof * PARAMS_PER_DOF;
+		float amp1 = m->values[base + 0];
+		float ph1 = m->values[base + 1];
+		float amp2 = m->values[base + 2];
+		float ph2 = m->values[base + 3];
+		float amp3 = m->values[base + 4];
+		float ph3 = m->values[base + 5];
+		float bias = m->values[base + 6] * 2.0f - 1.0f;
+
+		snprintf(title, sizeof(title),
+			 "Move_lib [%d] %s: a1:%.2f p1:%.2f a2:%.2f p2:%.2f a3:%.2f p3:%.2f b:%.2f",
+			 highlight_deck_b, dof_names[highlight_edit_dof],
+			 amp1, ph1, amp2, ph2, amp3, ph3, bias);
+	} else {
+		/* No DOF selected - show bias for all DOFs */
+		float rx = m->values[6] * 2.0f - 1.0f;
+		float ry = m->values[13] * 2.0f - 1.0f;
+		float rz = m->values[20] * 2.0f - 1.0f;
+		float tx = m->values[27] * 2.0f - 1.0f;
+		float ty = m->values[34] * 2.0f - 1.0f;
+		float tz = m->values[41] * 2.0f - 1.0f;
+
+		snprintf(title, sizeof(title),
+			 "Move_lib [%d] rx:%.2f ry:%.2f rz:%.2f tx:%.2f ty:%.2f tz:%.2f",
+			 highlight_deck_b, rx, ry, rz, tx, ty, tz);
+	}
+
+	glfwSetWindowTitle(main_window, title);
+}
+
+/**
  * poll_udp - Check for UDP packets and update moves
  */
 static void poll_udp(void)
@@ -196,6 +242,9 @@ static void poll_udp(void)
 				moves[m].values[p] = packet.values[m * BARS_PER_MOVE + p];
 			}
 		}
+
+		/* Update window title with deck_b values */
+		update_title();
 	}
 }
 
@@ -411,6 +460,7 @@ int main(int argc, char *argv[])
 		glfwTerminate();
 		return 1;
 	}
+	main_window = window;
 
 	glfwMakeContextCurrent(window);
 	glfwSwapInterval(1);

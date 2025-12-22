@@ -46,6 +46,7 @@
 #define MIDI_CC_FADER_4       74
 #define MIDI_CC_FADER_5       75
 #define MIDI_CC_FADER_6       76
+#define MIDI_CC_DOF_SELECT    77  /* DOF selector fader (rightmost) */
 
 /* MIDI NOTE mappings - button row 1 */
 #define MIDI_NOTE_RUN         8
@@ -228,6 +229,11 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 				case MIDI_CC_FADER_6:
 					ev.type = PLOTTER_FADER;
 					ev.id = PLOTTER_ID_FADER_6;
+					ev.value = value / 127.0f;
+					break;
+				case MIDI_CC_DOF_SELECT:
+					ev.type = PLOTTER_FADER;
+					ev.id = PLOTTER_ID_DOF_SELECT;
 					ev.value = value / 127.0f;
 					break;
 				default:
