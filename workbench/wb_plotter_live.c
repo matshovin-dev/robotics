@@ -1423,11 +1423,13 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			move_clear(&move_lib[move_no_b]);
 			printf("Cleared move %d (deck B)\n", move_no_b);
 			send_move_bars(move_no_b);
+			send_move_lib();
 			break;
 		case PLOTTER_ID_RANDOM_DECK_B:
 			move_randomize(&move_lib[move_no_b], 0.5f);
 			printf("Randomized move %d (deck B)\n", move_no_b);
 			send_move_bars(move_no_b);
+			send_move_lib();
 			break;
 		case PLOTTER_ID_PHASE_SHIFT_B: {
 			/* Shift alle faser i deck B for å flytte kurveform
