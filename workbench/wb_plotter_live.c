@@ -88,6 +88,7 @@ int run_repeat = 0;  // Loop playback when reaching end
 float run_loop_start = 0.0f;  // Start of current run loop
 float run_loop_end = 0.0f;  // End of current run loop
 int edit_dof = -1;  // -1 = OFF, 0-5 = DOF for fader editing
+int clipboard_move_nr = -1;  // Move number copied with COPY button
 char str[128]; /* tittelbar */
 int viz_sock = -1;
 
@@ -1667,6 +1668,21 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			update_title(window);
 			break;
 		}
+		case PLOTTER_ID_COPY_MOVE_NR:
+			clipboard_move_nr = move_no_b;
+			printf("Copied move %d to clipboard\n", clipboard_move_nr);
+			break;
+		case PLOTTER_ID_PASTE_MOVE:
+			if (clipboard_move_nr >= 0 && clipboard_move_nr < 100) {
+				/* Kopier all data fra clipboard move til current deck_b */
+				move_lib[move_no_b] = move_lib[clipboard_move_nr];
+				printf("Pasted move %d -> %d\n", clipboard_move_nr, move_no_b);
+				send_move_bars(move_no_b);
+				send_move_lib();
+			} else {
+				printf("No move in clipboard\n");
+			}
+			break;
 		}
 	} else if (ev->type == PLOTTER_FADER) {
 		/* DOF select fader (CC 97) - always active */

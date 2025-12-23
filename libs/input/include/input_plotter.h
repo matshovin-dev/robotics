@@ -47,6 +47,8 @@
 #define PLOTTER_ID_WIN_START_DOWN  28  /* Decrease window start beat (button) */
 #define PLOTTER_ID_WIN_END_UP      29  /* Increase window end beat (button) */
 #define PLOTTER_ID_WIN_END_DOWN    30  /* Decrease window end beat (button) */
+#define PLOTTER_ID_COPY_MOVE_NR    31  /* Copy deck_b move number to clipboard (button) */
+#define PLOTTER_ID_PASTE_MOVE      32  /* Paste clipboard move to deck_b (button) */
 
 /* Fader IDs for parameter editing (CC 70-77) */
 #define PLOTTER_ID_FADER_0         40  /* amp1 (CC 70) */

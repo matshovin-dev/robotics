@@ -66,14 +66,16 @@
 #define MIDI_NOTE_TIME_RIGHT_FAST 19
 #define MIDI_NOTE_SAVE_MOVE_LIB   20
 
-/* MIDI NOTE mappings - button row 3 */
+/* MIDI NOTE mappings - button row 3 (notes 24-31) */
 #define MIDI_NOTE_MUSIC_TOGGLE    24
+#define MIDI_NOTE_PASTE_MOVE      27  /* Paste clipboard move to deck_b */
 #define MIDI_NOTE_CLEAR_DECK_B    28
 #define MIDI_NOTE_SEGMENT_DOWN    38  /* Decrease current segment */
 #define MIDI_NOTE_PHASE_SHIFT_B   31
 
-/* MIDI NOTE mappings - button row 4 */
+/* MIDI NOTE mappings - button row 4 (notes 32-39) */
 #define MIDI_NOTE_RUN_4_BEATS     32
+#define MIDI_NOTE_COPY_MOVE_NR    35  /* Copy deck_b move number to clipboard */
 #define MIDI_NOTE_RANDOM_DECK_B   36
 #define MIDI_NOTE_SEGMENT_UP      30  /* Increase current segment */
 
@@ -318,6 +320,12 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					case MIDI_NOTE_WIN_END_DOWN:
 						ev.id = PLOTTER_ID_WIN_END_DOWN;
 						break;
+					case MIDI_NOTE_COPY_MOVE_NR:
+						ev.id = PLOTTER_ID_COPY_MOVE_NR;
+						break;
+					case MIDI_NOTE_PASTE_MOVE:
+						ev.id = PLOTTER_ID_PASTE_MOVE;
+						break;
 					default:
 						ev.type = -1;  /* Unknown button */
 						break;
@@ -393,6 +401,12 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					break;
 				case MIDI_NOTE_WIN_END_DOWN:
 					ev.id = PLOTTER_ID_WIN_END_DOWN;
+					break;
+				case MIDI_NOTE_COPY_MOVE_NR:
+					ev.id = PLOTTER_ID_COPY_MOVE_NR;
+					break;
+				case MIDI_NOTE_PASTE_MOVE:
+					ev.id = PLOTTER_ID_PASTE_MOVE;
 					break;
 				default:
 					ev.type = -1;
