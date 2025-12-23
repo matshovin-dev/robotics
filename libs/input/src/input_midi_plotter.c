@@ -49,15 +49,19 @@
 #define MIDI_CC_DOF_SELECT    77  /* DOF selector fader (rightmost) */
 
 /* MIDI NOTE mappings - button row 1 */
-#define MIDI_NOTE_RUN         8
-#define MIDI_NOTE_SPLINE_MODE 9
-#define MIDI_NOTE_TIME_LEFT   10
-#define MIDI_NOTE_TIME_RIGHT  11
-#define MIDI_NOTE_SAVE        12
-#define MIDI_NOTE_CYCLE_DOF   15
+#define MIDI_NOTE_RUN            8
+#define MIDI_NOTE_SPLINE_MODE    9
+#define MIDI_NOTE_TIME_LEFT      10
+#define MIDI_NOTE_TIME_RIGHT     11
+#define MIDI_NOTE_SAVE           12
+#define MIDI_NOTE_CYCLE_DOF      13
+#define MIDI_NOTE_WIN_START_UP   14   /* Increase window start beat */
+#define MIDI_NOTE_WIN_END_UP     15   /* Increase window end beat */
 
-/* MIDI NOTE mappings - button row 2 */
+/* MIDI NOTE mappings - button row 2 (notes 16-23) */
 #define MIDI_NOTE_REPEAT          16
+#define MIDI_NOTE_WIN_START_DOWN  22   /* Decrease window start beat */
+#define MIDI_NOTE_WIN_END_DOWN    23   /* Decrease window end beat */
 #define MIDI_NOTE_TIME_LEFT_FAST  18
 #define MIDI_NOTE_TIME_RIGHT_FAST 19
 #define MIDI_NOTE_SAVE_MOVE_LIB   20
@@ -302,6 +306,18 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					case MIDI_NOTE_SEGMENT_UP:
 						ev.id = PLOTTER_ID_SEGMENT_UP;
 						break;
+					case MIDI_NOTE_WIN_START_UP:
+						ev.id = PLOTTER_ID_WIN_START_UP;
+						break;
+					case MIDI_NOTE_WIN_START_DOWN:
+						ev.id = PLOTTER_ID_WIN_START_DOWN;
+						break;
+					case MIDI_NOTE_WIN_END_UP:
+						ev.id = PLOTTER_ID_WIN_END_UP;
+						break;
+					case MIDI_NOTE_WIN_END_DOWN:
+						ev.id = PLOTTER_ID_WIN_END_DOWN;
+						break;
 					default:
 						ev.type = -1;  /* Unknown button */
 						break;
@@ -365,6 +381,18 @@ static void midi_read_callback(const MIDIPacketList *pktlist,
 					break;
 				case MIDI_NOTE_SEGMENT_UP:
 					ev.id = PLOTTER_ID_SEGMENT_UP;
+					break;
+				case MIDI_NOTE_WIN_START_UP:
+					ev.id = PLOTTER_ID_WIN_START_UP;
+					break;
+				case MIDI_NOTE_WIN_START_DOWN:
+					ev.id = PLOTTER_ID_WIN_START_DOWN;
+					break;
+				case MIDI_NOTE_WIN_END_UP:
+					ev.id = PLOTTER_ID_WIN_END_UP;
+					break;
+				case MIDI_NOTE_WIN_END_DOWN:
+					ev.id = PLOTTER_ID_WIN_END_DOWN;
 					break;
 				default:
 					ev.type = -1;

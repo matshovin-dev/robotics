@@ -1627,6 +1627,46 @@ static void handle_midi_event(struct plotter_event *ev, SDL_Window *window)
 			}
 			update_title(window);
 			break;
+		case PLOTTER_ID_WIN_START_UP: {
+			float beat_duration = 60.0f / bpm;
+			start_beat++;
+			t_start = start_beat * beat_duration;
+			if (t_current < t_start)
+				t_current = t_start;
+			music_offset_samples = (int)(t_start * music_sample_rate);
+			printf("Window: beat %d - %d\n", start_beat, end_beat);
+			update_title(window);
+			break;
+		}
+		case PLOTTER_ID_WIN_START_DOWN: {
+			float beat_duration = 60.0f / bpm;
+			if (start_beat > 0)
+				start_beat--;
+			t_start = start_beat * beat_duration;
+			music_offset_samples = (int)(t_start * music_sample_rate);
+			printf("Window: beat %d - %d\n", start_beat, end_beat);
+			update_title(window);
+			break;
+		}
+		case PLOTTER_ID_WIN_END_UP: {
+			float beat_duration = 60.0f / bpm;
+			end_beat++;
+			t_end = end_beat * beat_duration;
+			printf("Window: beat %d - %d\n", start_beat, end_beat);
+			update_title(window);
+			break;
+		}
+		case PLOTTER_ID_WIN_END_DOWN: {
+			float beat_duration = 60.0f / bpm;
+			if (end_beat > start_beat + 1)
+				end_beat--;
+			t_end = end_beat * beat_duration;
+			if (t_current > t_end)
+				t_current = t_end;
+			printf("Window: beat %d - %d\n", start_beat, end_beat);
+			update_title(window);
+			break;
+		}
 		}
 	} else if (ev->type == PLOTTER_FADER) {
 		/* DOF select fader (CC 97) - always active */

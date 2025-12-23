@@ -43,16 +43,20 @@
 #define PLOTTER_ID_PHASE_SHIFT_B   24  /* Shift deck B phases to move waveform (button) */
 #define PLOTTER_ID_SEGMENT_DOWN    25  /* Decrease current segment (button) */
 #define PLOTTER_ID_SEGMENT_UP      26  /* Increase current segment (button) */
+#define PLOTTER_ID_WIN_START_UP    27  /* Increase window start beat (button) */
+#define PLOTTER_ID_WIN_START_DOWN  28  /* Decrease window start beat (button) */
+#define PLOTTER_ID_WIN_END_UP      29  /* Increase window end beat (button) */
+#define PLOTTER_ID_WIN_END_DOWN    30  /* Decrease window end beat (button) */
 
 /* Fader IDs for parameter editing (CC 70-77) */
-#define PLOTTER_ID_FADER_0         30  /* amp1 (CC 70) */
-#define PLOTTER_ID_FADER_1         31  /* phase1 (CC 71) */
-#define PLOTTER_ID_FADER_2         32  /* amp2 (CC 72) */
-#define PLOTTER_ID_FADER_3         33  /* phase2 (CC 73) */
-#define PLOTTER_ID_FADER_4         34  /* amp3 (CC 74) */
-#define PLOTTER_ID_FADER_5         35  /* phase3 (CC 75) */
-#define PLOTTER_ID_FADER_6         36  /* bias (CC 76) */
-#define PLOTTER_ID_DOF_SELECT      37  /* DOF selector fader (CC 77) */
+#define PLOTTER_ID_FADER_0         40  /* amp1 (CC 70) */
+#define PLOTTER_ID_FADER_1         41  /* phase1 (CC 71) */
+#define PLOTTER_ID_FADER_2         42  /* amp2 (CC 72) */
+#define PLOTTER_ID_FADER_3         43  /* phase2 (CC 73) */
+#define PLOTTER_ID_FADER_4         44  /* amp3 (CC 74) */
+#define PLOTTER_ID_FADER_5         45  /* phase3 (CC 75) */
+#define PLOTTER_ID_FADER_6         46  /* bias (CC 76) */
+#define PLOTTER_ID_DOF_SELECT      47  /* DOF selector fader (CC 77) */
 
 /**
  * struct plotter_event - Input event for plotter
