@@ -14,6 +14,7 @@
 #include "gl_math.h"
 #include "shader.h"
 #include "mesh.h"
+#include "ssao.h"
 #include "robotics/math/utils.h"
 #include "stewart/geometry.h"
 #include "stewart/kinematics.h"
@@ -64,12 +65,15 @@ static struct mesh *mesh_ground = NULL;
 /* Camera */
 static float camera_azimuth = 90.0f;
 static float camera_elevation = 30.0f;
-static float camera_distance = 400.0f;
+static float camera_distance = 700.0f;  /* Increased for narrower FOV */
 static float camera_center_y = 40.0f;  /* Lower to see ground better */
 
 /* Light positions */
 static float light_pos[3] = { 200.0f, 350.0f, 200.0f };
 static float fill_light_pos[3] = { -150.0f, 200.0f, -150.0f };  /* Opposite side */
+
+/* SSAO */
+static struct ssao_state ssao;
 
 /**
  * setup_shadow_map - Create shadow map framebuffer
@@ -273,7 +277,79 @@ static void render_stewart(GLuint shader)
 }
 
 /**
- * render_scene - Full render with shadow mapping
+ * render_gbuffer - Render scene to G-buffer for SSAO
+ */
+static void render_gbuffer(glm_mat4 projection, glm_mat4 view, int width, int height)
+{
+	glBindFramebuffer(GL_FRAMEBUFFER, ssao.gbuffer_fbo);
+	glViewport(0, 0, width, height);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glUseProgram(ssao.gbuffer_shader);
+	shader_set_mat4(ssao.gbuffer_shader, "projection", projection);
+	shader_set_mat4(ssao.gbuffer_shader, "view", view);
+
+	/* Render all geometry to G-buffer */
+	render_stewart(ssao.gbuffer_shader);
+
+	glm_mat4 ground_model;
+	glm_mat4_translate(ground_model, 0.0f, -65.0f, 0.0f);
+	shader_set_mat4(ssao.gbuffer_shader, "model", ground_model);
+	mesh_draw(mesh_ground);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+/**
+ * render_ssao - Compute SSAO from G-buffer
+ */
+static void render_ssao(glm_mat4 projection, int width, int height)
+{
+	/* SSAO pass */
+	glBindFramebuffer(GL_FRAMEBUFFER, ssao.ssao_fbo);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glUseProgram(ssao.ssao_shader);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, ssao.gbuffer_position);
+	shader_set_int(ssao.ssao_shader, "gPosition", 0);
+
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, ssao.gbuffer_normal);
+	shader_set_int(ssao.ssao_shader, "gNormal", 1);
+
+	glActiveTexture(GL_TEXTURE2);
+	glBindTexture(GL_TEXTURE_2D, ssao.noise_texture);
+	shader_set_int(ssao.ssao_shader, "texNoise", 2);
+
+	shader_set_mat4(ssao.ssao_shader, "projection", projection);
+	shader_set_float(ssao.ssao_shader, "radius", ssao.radius);
+	shader_set_float(ssao.ssao_shader, "bias", ssao.bias);
+	shader_set_float(ssao.ssao_shader, "intensity", ssao.intensity);
+
+	float noise_scale[2] = { (float)width / 4.0f, (float)height / 4.0f };
+	GLint loc = glGetUniformLocation(ssao.ssao_shader, "noiseScale");
+	glUniform2fv(loc, 1, noise_scale);
+
+	ssao_render_quad(&ssao);
+
+	/* Blur pass */
+	glBindFramebuffer(GL_FRAMEBUFFER, ssao.ssao_blur_fbo);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	glUseProgram(ssao.blur_shader);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, ssao.ssao_texture);
+	shader_set_int(ssao.blur_shader, "ssaoInput", 0);
+
+	ssao_render_quad(&ssao);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+/**
+ * render_scene - Full render with shadow mapping and optional SSAO
  */
 static void render_scene(int width, int height)
 {
@@ -293,7 +369,7 @@ static void render_scene(int width, int height)
 	glm_vec3 center = { 0.0f, camera_center_y, 0.0f };
 	glm_vec3 up = { 0.0f, 1.0f, 0.0f };
 
-	glm_mat4_perspective(projection, 45.0f * M_PI / 180.0f, aspect, 1.0f, 2000.0f);
+	glm_mat4_perspective(projection, 25.0f * M_PI / 180.0f, aspect, 1.0f, 2000.0f);
 	glm_mat4_look_at(view, eye, center, up);
 
 	/* === PASS 1: Shadow map === */
@@ -307,7 +383,7 @@ static void render_scene(int width, int height)
 	glCullFace(GL_FRONT);  /* Reduce shadow acne */
 	render_stewart(shadow_shader);
 
-	/* Ground for shadow pass - moved down below base */
+	/* Ground for shadow pass */
 	glm_mat4 ground_model;
 	glm_mat4_translate(ground_model, 0.0f, -65.0f, 0.0f);
 	shader_set_mat4(shadow_shader, "model", ground_model);
@@ -315,7 +391,13 @@ static void render_scene(int width, int height)
 
 	glCullFace(GL_BACK);
 
-	/* === PASS 2: Scene with shadows === */
+	/* === PASS 2 & 3: SSAO (if enabled) === */
+	if (ssao.enabled) {
+		render_gbuffer(projection, view, width, height);
+		render_ssao(projection, width, height);
+	}
+
+	/* === PASS 4: Final scene render === */
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	glViewport(0, 0, width, height);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -326,19 +408,25 @@ static void render_scene(int width, int height)
 	shader_set_mat4(scene_shader, "lightSpaceMatrix", light_space);
 	shader_set_vec3(scene_shader, "lightPos", light_pos[0], light_pos[1], light_pos[2]);
 	shader_set_vec3(scene_shader, "fillLightPos", fill_light_pos[0], fill_light_pos[1], fill_light_pos[2]);
-	shader_set_float(scene_shader, "fillLightStrength", 0.3f);  /* 30% intensity */
+	shader_set_float(scene_shader, "fillLightStrength", 0.3f);
 	shader_set_vec3(scene_shader, "viewPos", eye[0], eye[1], eye[2]);
-	shader_set_float(scene_shader, "ambientStrength", 0.35f);  /* Slightly reduced since we have fill light */
+	shader_set_float(scene_shader, "ambientStrength", 0.35f);
 	shader_set_float(scene_shader, "shadowSoftness", 1.5f);
-	shader_set_float(scene_shader, "flipNormals", 1.0f);  /* Default: don't flip */
-	shader_set_float(scene_shader, "unlit", 0.0f);        /* Default: use lighting */
-	shader_set_float(scene_shader, "checkerboard", 0.0f); /* Default: no checkerboard */
-	shader_set_float(scene_shader, "checkerSize", 50.0f); /* Size of checker squares */
+	shader_set_float(scene_shader, "flipNormals", 1.0f);
+	shader_set_float(scene_shader, "unlit", 0.0f);
+	shader_set_float(scene_shader, "checkerboard", 0.0f);
+	shader_set_float(scene_shader, "checkerSize", 50.0f);
+	shader_set_float(scene_shader, "ssaoEnabled", ssao.enabled ? 1.0f : 0.0f);
 
 	/* Bind shadow map */
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, shadow_map);
 	shader_set_int(scene_shader, "shadowMap", 0);
+
+	/* Bind SSAO map */
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, ssao.enabled ? ssao.ssao_blur_texture : 0);
+	shader_set_int(scene_shader, "ssaoMap", 1);
 
 	/* Render Stewart */
 	render_stewart(scene_shader);
@@ -346,9 +434,9 @@ static void render_scene(int width, int height)
 	/* Render ground with checkerboard pattern */
 	glm_mat4_translate(ground_model, 0.0f, -65.0f, 0.0f);
 	shader_set_mat4(scene_shader, "model", ground_model);
-	shader_set_float(scene_shader, "checkerboard", 1.0f);  /* Enable checkerboard */
+	shader_set_float(scene_shader, "checkerboard", 1.0f);
 	mesh_draw(mesh_ground);
-	shader_set_float(scene_shader, "checkerboard", 0.0f);  /* Disable for next frame */
+	shader_set_float(scene_shader, "checkerboard", 0.0f);
 }
 
 /**
@@ -444,8 +532,12 @@ static void key_callback(GLFWwindow *window, int key, int scancode,
 	case GLFW_KEY_R:
 		camera_azimuth = 90.0f;
 		camera_elevation = 30.0f;
-		camera_distance = 400.0f;
-		camera_center_y = 80.0f;
+		camera_distance = 700.0f;
+		camera_center_y = 40.0f;
+		break;
+	case GLFW_KEY_O:
+		ssao.enabled = !ssao.enabled;
+		printf("SSAO: %s\n", ssao.enabled ? "ON" : "OFF");
 		break;
 	case GLFW_KEY_ESCAPE:
 		glfwSetWindowShouldClose(window, GLFW_TRUE);
@@ -520,6 +612,12 @@ int main(int argc, char *argv[])
 	if (setup_shadow_map() < 0)
 		return 1;
 
+	/* Setup SSAO */
+	if (ssao_init(&ssao, WINDOW_WIDTH, WINDOW_HEIGHT) < 0) {
+		fprintf(stderr, "Warning: SSAO init failed, continuing without\n");
+		ssao.enabled = 0;
+	}
+
 	/* Load models */
 	if (load_models(ROBOT_TYPE_MX64) < 0)
 		return 1;
@@ -535,6 +633,7 @@ int main(int argc, char *argv[])
 	printf("  Arrows: Rotate camera\n");
 	printf("  Q/W: Zoom in/out\n");
 	printf("  A/S: Lower/raise focus\n");
+	printf("  O: Toggle SSAO\n");
 	printf("  R: Reset camera\n");
 	printf("  ESC: Exit\n\n");
 
@@ -557,6 +656,8 @@ int main(int argc, char *argv[])
 	mesh_free(mesh_legR);
 	mesh_free(mesh_legLong);
 	mesh_free(mesh_ground);
+
+	ssao_cleanup(&ssao);
 
 	glDeleteFramebuffers(1, &shadow_fbo);
 	glDeleteTextures(1, &shadow_map);

@@ -31,8 +31,8 @@ VIZ_COMMON_SRC = ../common/src/udp.c
 VIZ_COMMON_OBJ = $(BUILD_DIR)/udp.o
 
 # Local sources
-LOCAL_SRC = src/main.c src/shader.c src/mesh.c
-LOCAL_OBJ = $(BUILD_DIR)/main.o $(BUILD_DIR)/shader.o $(BUILD_DIR)/mesh.o
+LOCAL_SRC = src/main.c src/shader.c src/mesh.c src/ssao.c
+LOCAL_OBJ = $(BUILD_DIR)/main.o $(BUILD_DIR)/shader.o $(BUILD_DIR)/mesh.o $(BUILD_DIR)/ssao.o
 
 # All objects
 OBJ = $(MATH_OBJ) $(STEWART_OBJ) $(VIZ_COMMON_OBJ) $(LOCAL_OBJ)
@@ -63,6 +63,9 @@ $(BUILD_DIR)/shader.o: src/shader.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR)/mesh.o: src/mesh.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD_DIR)/ssao.o: src/ssao.c | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
 # Create build directory

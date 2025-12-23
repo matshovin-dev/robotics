@@ -6,6 +6,7 @@ layout(location = 1) in vec3 aNormal;
 out vec3 FragPos;
 out vec3 Normal;
 out vec4 FragPosLightSpace;
+out vec2 ScreenCoord;
 
 uniform mat4 model;
 uniform mat4 view;
@@ -19,4 +20,7 @@ void main()
     FragPosLightSpace = lightSpaceMatrix * vec4(FragPos, 1.0);
 
     gl_Position = projection * view * vec4(FragPos, 1.0);
+
+    // Screen coordinates for SSAO lookup (in normalized device coords)
+    ScreenCoord = (gl_Position.xy / gl_Position.w) * 0.5 + 0.5;
 }

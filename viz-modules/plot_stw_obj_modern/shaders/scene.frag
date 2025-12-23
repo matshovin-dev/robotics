@@ -3,10 +3,13 @@
 in vec3 FragPos;
 in vec3 Normal;
 in vec4 FragPosLightSpace;
+in vec2 ScreenCoord;
 
 out vec4 FragColor;
 
 uniform sampler2D shadowMap;
+uniform sampler2D ssaoMap;
+uniform float ssaoEnabled;
 uniform vec3 lightPos;
 uniform vec3 fillLightPos;   // Fill light from opposite side
 uniform float fillLightStrength;
@@ -60,8 +63,8 @@ void main()
         float cx = floor(FragPos.x / checkerSize);
         float cz = floor(FragPos.z / checkerSize);
         float checker = mod(cx + cz, 2.0);
-        // Dark gray and medium gray - more contrast
-        color = mix(vec3(0.15, 0.15, 0.18), vec3(0.4, 0.4, 0.45), checker);
+        // Dark gray and medium gray - more contrast, dimmed by 0.5
+        color = mix(vec3(0.075, 0.075, 0.09), vec3(0.2, 0.2, 0.225), checker);
     }
 
     vec3 normal = normalize(Normal) * flipNormals;
@@ -89,8 +92,24 @@ void main()
     float fillDiff = max(dot(normal, fillLightDir), 0.0);
     vec3 fillDiffuse = fillDiff * lightColor * fillLightStrength;
 
+    // Fresnel effect - edges catch more light (rim lighting)
+    float fresnel = pow(1.0 - max(dot(normal, viewDir), 0.0), 3.0);
+    vec3 fresnelColor = fresnel * vec3(0.15, 0.15, 0.2);  // Subtle blue-ish rim
+
+    // SSAO - sample from pre-computed texture or use simple cavity fallback
+    float ao = 1.0;
+    if (ssaoEnabled > 0.5) {
+        ao = texture(ssaoMap, ScreenCoord).r;
+    } else {
+        // Simple cavity/curvature darkening (fallback when SSAO disabled)
+        vec3 dNdx = dFdx(normal);
+        vec3 dNdy = dFdy(normal);
+        float curvature = length(dNdx) + length(dNdy);
+        ao = 1.0 - clamp(curvature * 2.0, 0.0, 0.4);
+    }
+
     // Final color
-    vec3 lighting = ambient + (1.0 - shadow) * (diffuse + specular) + fillDiffuse;
+    vec3 lighting = ambient * ao + (1.0 - shadow) * (diffuse + specular) + fillDiffuse + fresnelColor;
 
     // Unlit mode for debugging
     if (unlit > 0.5) {
